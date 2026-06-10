@@ -1,0 +1,137 @@
+#usda 1.0
+(
+    doc = """Test: 20-node linear chain with per-segment tapered radius.
+
+    Shape: horizontal line from (-0.19, 0, 0.5) to (0.19, 0, 0.5), 19 segments of 0.02m each.
+    First node is fixed (kinematic anchor).
+
+    Radius profile (19 segments):
+      Segments 0-3:  4mm  (thick end, near fixed anchor)
+      Segments 4-6:  3mm  (taper down)
+      Segments 7-11: 2mm  (thin midsection)
+      Segments 12-14: 3mm (taper up)
+      Segments 15-18: 4mm (thick end, free tip)
+
+    Visual BasisCurves widths = 2 * per-segment radius, so the rendered
+    curve should visually appear thin in the middle and thick at both ends.
+
+    Tests:
+      - float[] newton:radius with length E (per-segment)
+      - Visual widths sync from radius array
+      - Fixed single node at index 0"""
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def Xform "rod"
+    {
+        def Xform "curve_0" (
+            prepend apiSchemas = ["NewtonRodAPI", "MaterialBindingAPI"]
+        )
+        {
+            rel material:binding = </World/Looks/CablePhysicsMaterial> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+            point3f[] newton:points = [
+                (-0.19000, 0.00000, 0.50000),
+                (-0.17000, 0.00000, 0.50000),
+                (-0.15000, 0.00000, 0.50000),
+                (-0.13000, 0.00000, 0.50000),
+                (-0.11000, 0.00000, 0.50000),
+                (-0.09000, 0.00000, 0.50000),
+                (-0.07000, 0.00000, 0.50000),
+                (-0.05000, 0.00000, 0.50000),
+                (-0.03000, 0.00000, 0.50000),
+                (-0.01000, 0.00000, 0.50000),
+                ( 0.01000, 0.00000, 0.50000),
+                ( 0.03000, 0.00000, 0.50000),
+                ( 0.05000, 0.00000, 0.50000),
+                ( 0.07000, 0.00000, 0.50000),
+                ( 0.09000, 0.00000, 0.50000),
+                ( 0.11000, 0.00000, 0.50000),
+                ( 0.13000, 0.00000, 0.50000),
+                ( 0.17000, 0.00000, 0.50000),
+                ( 0.19000, 0.00000, 0.50000),
+                ( 0.21000, 0.00000, 0.50000)
+            ]
+
+            # Per-segment radius (19 segments = 20 nodes - 1): tapered profile
+            # thick(4mm) → taper(3mm) → thin(2mm) → taper(3mm) → thick(4mm)
+            float[] newton:radius = [
+                0.00400, 0.00400, 0.00400, 0.00400,
+                0.00300, 0.00300, 0.00300,
+                0.00200, 0.00200, 0.00200, 0.00200, 0.00200,
+                0.00300, 0.00300, 0.00300,
+                0.00400, 0.00400, 0.00400, 0.00400
+            ]
+
+            float newton:contact_ke = 100.0
+            float newton:contact_kd = 1.0
+
+            int[] newton:fixedPoints = [0]
+
+            float[] newton:stretchStiffness = [100000.0]
+            float[] newton:stretchDamping = [0.0]
+            float[] newton:bendStiffness = [500.0]
+            float[] newton:bendDamping = [0.001]
+            bool newton:wrapInArticulation = true
+
+            def BasisCurves "visual" (
+                prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
+            ) {
+                uniform token[] curveType = ["linear"]
+                int[] curveVertexCounts = [20]
+                int[] newton:rodPointIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+                uniform token type = "linear"
+                uniform token wrap = "nonperiodic"
+                # widths = 2 * radius per segment, mapped to vertices
+                # vertex i uses the radius of segment i (or segment i-1 for the last vertex)
+                float[] widths = [
+                    0.00800, 0.00800, 0.00800, 0.00800,
+                    0.00600, 0.00600, 0.00600,
+                    0.00400, 0.00400, 0.00400, 0.00400, 0.00400,
+                    0.00600, 0.00600, 0.00600,
+                    0.00800, 0.00800, 0.00800, 0.00800, 0.00800
+                ]
+                point3f[] points = [
+                    (-0.19000, 0.00000, 0.50000),
+                    (-0.17000, 0.00000, 0.50000),
+                    (-0.15000, 0.00000, 0.50000),
+                    (-0.13000, 0.00000, 0.50000),
+                    (-0.11000, 0.00000, 0.50000),
+                    (-0.09000, 0.00000, 0.50000),
+                    (-0.07000, 0.00000, 0.50000),
+                    (-0.05000, 0.00000, 0.50000),
+                    (-0.03000, 0.00000, 0.50000),
+                    (-0.01000, 0.00000, 0.50000),
+                    ( 0.01000, 0.00000, 0.50000),
+                    ( 0.03000, 0.00000, 0.50000),
+                    ( 0.05000, 0.00000, 0.50000),
+                    ( 0.07000, 0.00000, 0.50000),
+                    ( 0.09000, 0.00000, 0.50000),
+                    ( 0.11000, 0.00000, 0.50000),
+                    ( 0.13000, 0.00000, 0.50000),
+                    ( 0.17000, 0.00000, 0.50000),
+                    ( 0.19000, 0.00000, 0.50000),
+                    ( 0.21000, 0.00000, 0.50000)
+                ]
+            }
+        }
+    }
+
+    def Scope "Looks"
+    {
+        def Material "CablePhysicsMaterial" (
+            prepend apiSchemas = ["PhysicsMaterialAPI", "NewtonMaterialAPI"]
+        )
+        {
+            float physics:dynamicFriction = 0.5
+            float physics:staticFriction = 0.5
+            float newton:contactStiffness = 100.0
+            float newton:contactDamping = 1.0
+        }
+    }
+}

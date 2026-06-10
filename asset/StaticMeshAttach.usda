@@ -1,0 +1,151 @@
+#usda 1.0
+(
+    doc = """Test: cable attached directly to static Mesh prims via newton:body.
+
+    Demonstrates that newton:body can target any prim carrying PhysicsRigidBodyAPI,
+    including a def Mesh (not just Cube/Sphere shorthand primitives).
+
+    Layout:
+      BracketLeft  (def Mesh + PhysicsRigidBodyAPI, kinematicEnabled=true)  at x=-0.35
+      BracketRight (def Mesh + PhysicsRigidBodyAPI, kinematicEnabled=true)  at x=+0.35
+      Cable: 30 nodes, catenary sag ~15cm, node 0 attached to BracketLeft,
+             node 29 attached to BracketRight.
+
+    Tests:
+      - newton:body relationship pointing to a def Mesh prim (real mesh topology)
+      - Kinematic world-anchored mesh bodies (no parent joint, no ArticulationRoot needed)
+      - Cable freely hangs between two static mesh anchors under gravity
+      - PhysicsCollisionAPI on mesh allows cable capsules to rest on bracket surface"""
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    # -----------------------------------------------------------------------
+    # Left bracket: a box mesh acting as a kinematic wall anchor
+    # -----------------------------------------------------------------------
+    def Mesh "BracketLeft" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
+    )
+    {
+        bool physics:kinematicEnabled = true
+        double3 xformOp:translate = (-0.35, 0.0, 0.65)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+        # Simple box mesh 40x40x40 mm centered at prim origin
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0,3,2,1, 4,5,6,7, 0,1,5,4, 2,3,7,6, 0,4,7,3, 1,2,6,5]
+        point3f[] points = [
+            (-0.02, -0.02, -0.02),
+            ( 0.02, -0.02, -0.02),
+            ( 0.02,  0.02, -0.02),
+            (-0.02,  0.02, -0.02),
+            (-0.02, -0.02,  0.02),
+            ( 0.02, -0.02,  0.02),
+            ( 0.02,  0.02,  0.02),
+            (-0.02,  0.02,  0.02)
+        ]
+        uniform token subdivisionScheme = "none"
+    }
+
+    # -----------------------------------------------------------------------
+    # Right bracket: identical box mesh, mirrored placement
+    # -----------------------------------------------------------------------
+    def Mesh "BracketRight" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
+    )
+    {
+        bool physics:kinematicEnabled = true
+        double3 xformOp:translate = (0.35, 0.0, 0.65)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0,3,2,1, 4,5,6,7, 0,1,5,4, 2,3,7,6, 0,4,7,3, 1,2,6,5]
+        point3f[] points = [
+            (-0.02, -0.02, -0.02),
+            ( 0.02, -0.02, -0.02),
+            ( 0.02,  0.02, -0.02),
+            (-0.02,  0.02, -0.02),
+            (-0.02, -0.02,  0.02),
+            ( 0.02, -0.02,  0.02),
+            ( 0.02,  0.02,  0.02),
+            (-0.02,  0.02,  0.02)
+        ]
+        uniform token subdivisionScheme = "none"
+    }
+
+    # -----------------------------------------------------------------------
+    # Cable: 30-node catenary, sagging ~15cm at midpoint
+    # -----------------------------------------------------------------------
+    def Xform "rod"
+    {
+        def Xform "curve_0" (
+            prepend apiSchemas = ["NewtonRodAPI", "MaterialBindingAPI"]
+        )
+        {
+            rel material:binding = </World/Looks/CablePhysicsMaterial> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+            point3f[] newton:points = [(-0.35000, 0.00000, 0.65000), (-0.32586, 0.00000, 0.63002), (-0.30172, 0.00000, 0.61147), (-0.27759, 0.00000, 0.59435), (-0.25345, 0.00000, 0.57866), (-0.22931, 0.00000, 0.56439), (-0.20517, 0.00000, 0.55155), (-0.18103, 0.00000, 0.54013), (-0.15690, 0.00000, 0.53014), (-0.13276, 0.00000, 0.52158), (-0.10862, 0.00000, 0.51445), (-0.08448, 0.00000, 0.50874), (-0.06034, 0.00000, 0.50446), (-0.03621, 0.00000, 0.50161), (-0.01207, 0.00000, 0.50018), (0.01207, 0.00000, 0.50018), (0.03621, 0.00000, 0.50161), (0.06034, 0.00000, 0.50446), (0.08448, 0.00000, 0.50874), (0.10862, 0.00000, 0.51445), (0.13276, 0.00000, 0.52158), (0.15690, 0.00000, 0.53014), (0.18103, 0.00000, 0.54013), (0.20517, 0.00000, 0.55155), (0.22931, 0.00000, 0.56439), (0.25345, 0.00000, 0.57866), (0.27759, 0.00000, 0.59435), (0.30172, 0.00000, 0.61147), (0.32586, 0.00000, 0.63002), (0.35000, 0.00000, 0.65000)]
+            float[] newton:radius = [0.00250]
+            float newton:contact_ke = 100.0
+            float newton:contact_kd = 1.0
+            int[] newton:fixedPoints = []
+            float[] newton:stretchStiffness = [580682.44]
+            float[] newton:stretchDamping = [0.00001]
+            float[] newton:bendStiffness = [5806.824]
+            float[] newton:bendDamping = [0.1]
+            bool newton:wrapInArticulation = true
+            # node 0 attached to BracketLeft (def Mesh, kinematic)
+            # node 29 attached to BracketRight (def Mesh, kinematic)
+
+            def BasisCurves "visual" (
+                prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
+            ) {
+                uniform token[] curveType = ["linear"]
+                int[] curveVertexCounts = [30]
+                int[] newton:rodPointIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+                uniform token type = "linear"
+                uniform token wrap = "nonperiodic"
+                float[] widths = [0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005]
+                point3f[] points = [(-0.35000, 0.00000, 0.65000), (-0.32586, 0.00000, 0.63002), (-0.30172, 0.00000, 0.61147), (-0.27759, 0.00000, 0.59435), (-0.25345, 0.00000, 0.57866), (-0.22931, 0.00000, 0.56439), (-0.20517, 0.00000, 0.55155), (-0.18103, 0.00000, 0.54013), (-0.15690, 0.00000, 0.53014), (-0.13276, 0.00000, 0.52158), (-0.10862, 0.00000, 0.51445), (-0.08448, 0.00000, 0.50874), (-0.06034, 0.00000, 0.50446), (-0.03621, 0.00000, 0.50161), (-0.01207, 0.00000, 0.50018), (0.01207, 0.00000, 0.50018), (0.03621, 0.00000, 0.50161), (0.06034, 0.00000, 0.50446), (0.08448, 0.00000, 0.50874), (0.10862, 0.00000, 0.51445), (0.13276, 0.00000, 0.52158), (0.15690, 0.00000, 0.53014), (0.18103, 0.00000, 0.54013), (0.20517, 0.00000, 0.55155), (0.22931, 0.00000, 0.56439), (0.25345, 0.00000, 0.57866), (0.27759, 0.00000, 0.59435), (0.30172, 0.00000, 0.61147), (0.32586, 0.00000, 0.63002), (0.35000, 0.00000, 0.65000)]
+            }
+
+            def Xform "attachment_left" (
+                prepend apiSchemas = ["NewtonRodAttachmentAPI"]
+            )
+            {
+                int newton:nodeIndex = 0
+                rel newton:body = </World/BracketLeft>
+                point3f newton:localPos1 = (0.0, 0.0, 0.0)
+                quatf newton:localRot0 = (1, 0, 0, 0)
+                quatf newton:localRot1 = (1, 0, 0, 0)
+            }
+
+            def Xform "attachment_right" (
+                prepend apiSchemas = ["NewtonRodAttachmentAPI"]
+            )
+            {
+                int newton:nodeIndex = 29
+                rel newton:body = </World/BracketRight>
+                point3f newton:localPos1 = (0.0, 0.0, 0.0)
+                quatf newton:localRot0 = (1, 0, 0, 0)
+                quatf newton:localRot1 = (1, 0, 0, 0)
+            }
+        }
+    }
+    def Scope "Looks"
+    {
+        def Material "CablePhysicsMaterial" (
+            prepend apiSchemas = ["PhysicsMaterialAPI", "NewtonMaterialAPI"]
+        )
+        {
+            float physics:dynamicFriction = 0.5
+            float physics:staticFriction = 0.5
+            float newton:contactStiffness = 100.0
+            float newton:contactDamping = 1.0
+        }
+    }
+}
