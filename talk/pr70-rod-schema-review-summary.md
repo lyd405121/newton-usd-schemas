@@ -50,3 +50,22 @@ The review outcome is to make the Rod schema more abstract, schema-oriented, and
 - Replace implementation-specific defaults and sentinels with repo-wide schema conventions.
 - Rename representation-oriented fields to semantic names.
 - Reconsider whether `closed` belongs in the schema once explicit graph topology is available.
+
+## Implementation Status
+
+The current implementation follows the review direction and the later design decisions made after this discussion:
+
+- `newton:radius` no longer documents a hard-coded schema default. Empty radius arrays are described as using the engine default.
+- `newton:fixedPoints` has been removed. Fixed-to-world rod nodes are now represented by `NewtonRodAttachmentAPI` with `newton:nodeIndices` and no authored `newton:body` target.
+- `NewtonRodAttachmentAPI` now uses `int[] newton:nodeIndices` instead of a singular node index. One attachment prim can describe multiple rod nodes attached to the same target.
+- `newton:attachmentType` has been removed. Attachment semantics are determined by whether `newton:body` is authored: absent means world-fixed, present means attached to that rigid body.
+- `newton:localPos1`, `newton:localRot0`, and `newton:localRot1` are arrays. Length 1 broadcasts to all `newton:nodeIndices`; length N maps one-to-one to N node indices.
+- `newton:youngsModulus` and `newton:poissonRatio` now use `-inf` as the unset sentinel.
+- `newton:quaternions` has been renamed to `newton:orientations`; the doc keeps quaternion as the representation detail.
+- `newton:closed` has been removed. All rods must author explicit `newton:edges`; closed loops are represented by an edge connecting the final node back to the first node.
+- The simulation script now requires non-empty `newton:edges`, uses graph rod construction, and expands the new attachment groups into world pins or per-node fixed constraints to the target body.
+- The rod tests have been updated for the new schema shape without adding negative tests for removed fields.
+- The sample assets have been migrated away from `fixedPoints`, `closed`, `quaternions`, singular `nodeIndex`, and `attachmentType`. Non-Text single-rod assets now carry `NewtonRodAPI` directly on the rod Xform; Text assets keep their per-character rod structure.
+- `asset/MultiNodeAttach.usda` demonstrates multiple rod nodes attached to one rigid body through a single `NewtonRodAttachmentAPI` prim.
+
+Remaining note: this preserves the current split between simulation rods on `Xform + NewtonRodAPI` and visual curves on child `BasisCurves + NewtonRodVisualCurveAPI`. Moving RodAPI directly onto `BasisCurves` remains a separate schema design decision and was not part of this implementation pass.
