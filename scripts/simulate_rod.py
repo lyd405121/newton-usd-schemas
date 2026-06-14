@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # SPDX-FileCopyrightText: Copyright (c) 2025 The Newton Developers
 # SPDX-License-Identifier: Apache-2.0
 
@@ -24,13 +23,13 @@ REPO_ROOT = SCRIPT_DIR.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import newton
-import newton.solvers
-import newton.viewer
-import warp as wp
-from pxr import Usd, UsdGeom
+import newton  # noqa: E402
+import newton.solvers  # noqa: E402
+import newton.viewer  # noqa: E402
+import warp as wp  # noqa: E402
+from pxr import Usd, UsdGeom  # noqa: E402
 
-import newton_usd_schemas  # noqa: F401 — registers NewtonRodAPI / NewtonRodAttachmentAPI
+import newton_usd_schemas  # noqa: E402, F401 — registers NewtonRodAPI / NewtonRodAttachmentAPI
 
 DEFAULT_STEPS = 200
 DEFAULT_SUBSTEPS = 10
@@ -61,14 +60,13 @@ def _resolve_usd_path(path_arg: str) -> Path:
             return candidate.resolve()
 
     checked = "\n  - ".join(str(candidate.resolve()) for candidate in candidates)
-    raise FileNotFoundError(
-        f"USD file not found: {path_arg}\nChecked:\n  - {checked}"
-    )
+    raise FileNotFoundError(f"USD file not found: {path_arg}\nChecked:\n  - {checked}")
 
 
 # ---------------------------------------------------------------------------
 # USD parsing helpers
 # ---------------------------------------------------------------------------
+
 
 def _scalar_or_uniform(arr, default: float) -> float:
     """Return arr[0] if arr has 1+ elements, else default."""
@@ -120,9 +118,9 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
             raise RuntimeError(f"{path}: missing required non-empty newton:edges")
 
         # Expand newton:radius to per-segment list
-        DEFAULT_RADIUS = 0.005
+        default_radius = 0.005
         if not radius_raw or len(radius_raw) == 0:
-            radii = [DEFAULT_RADIUS] * n_edges
+            radii = [default_radius] * n_edges
         elif len(radius_raw) == 1:
             radii = [float(radius_raw[0])] * n_edges
         else:
@@ -131,18 +129,19 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 radii += [radii[-1]] * (n_edges - len(radii))
 
         # Representative physics radius (first segment, capped to 45% of seg length)
-        rep_radius = radii[0] if radii else DEFAULT_RADIUS
+        rep_radius = radii[0] if radii else default_radius
         if n_nodes >= 2:
             seg_len = float(wp.length(positions[1] - positions[0]))
             rep_radius = min(rep_radius, seg_len * 0.45)
-        if rep_radius < (radii[0] if radii else DEFAULT_RADIUS):
-            print(f"         radius capped: {(radii[0] if radii else DEFAULT_RADIUS)*1000:.2f}mm → {rep_radius*1000:.2f}mm  (seg_len={seg_len*1000:.2f}mm)")
+        if rep_radius < (radii[0] if radii else default_radius):
+            source_radius = radii[0] if radii else default_radius
+            print(f"         radius capped: {source_radius * 1000:.2f}mm → {rep_radius * 1000:.2f}mm  " f"(seg_len={seg_len * 1000:.2f}mm)")
 
         # --- physics attributes ---
-        ss_raw   = prim.GetAttribute("newton:stretchStiffness").Get()
-        sd_raw   = prim.GetAttribute("newton:stretchDamping").Get()
-        bs_raw   = prim.GetAttribute("newton:bendStiffness").Get()
-        bd_raw   = prim.GetAttribute("newton:bendDamping").Get()
+        ss_raw = prim.GetAttribute("newton:stretchStiffness").Get()
+        sd_raw = prim.GetAttribute("newton:stretchDamping").Get()
+        bs_raw = prim.GetAttribute("newton:bendStiffness").Get()
+        bd_raw = prim.GetAttribute("newton:bendDamping").Get()
         wrap_art = prim.GetAttribute("newton:wrapInArticulation").Get()
 
         wrap = bool(wrap_art) if wrap_art is not None else True
@@ -150,9 +149,9 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
         cfg = newton.ModelBuilder.ShapeConfig()
 
         stretch_stiffness = _scalar_or_uniform(ss_raw, 1e5)
-        stretch_damping   = _scalar_or_uniform(sd_raw, 0.0)
-        bend_stiffness    = _scalar_or_uniform(bs_raw, 0.0)
-        bend_damping      = _scalar_or_uniform(bd_raw, 0.0)
+        stretch_damping = _scalar_or_uniform(sd_raw, 0.0)
+        bend_stiffness = _scalar_or_uniform(bs_raw, 0.0)
+        bend_damping = _scalar_or_uniform(bd_raw, 0.0)
 
         print(f"[rod] {path}: add_rod_graph  nodes={n_nodes}  edges={n_edges}  radius={rep_radius:.4f}")
         body_ids, joint_ids = builder.add_rod_graph(
@@ -172,7 +171,7 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
 
         # --- filter all intra-rod self-collisions (adjacent + non-adjacent) ---
         for i, body_a in enumerate(body_ids):
-            for body_b in body_ids[i + 1:]:
+            for body_b in body_ids[i + 1 :]:
                 for shape_a in builder.body_shapes.get(body_a, []):
                     for shape_b in builder.body_shapes.get(body_b, []):
                         builder.add_shape_collision_filter_pair(int(shape_a), int(shape_b))
@@ -180,10 +179,7 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
 
         # Segment half-lengths and edges_list for visual sync
         edges_list = edges
-        half_lengths = [
-            float(wp.length(positions[v] - positions[u])) / 2.0
-            for u, v in edges_list
-        ]
+        half_lengths = [float(wp.length(positions[v] - positions[u])) / 2.0 for u, v in edges_list]
 
         rod_info[path] = {
             "body_indices": body_ids,
@@ -224,7 +220,7 @@ def sync_visual_curves(stage: Usd.Stage, rod_info: dict, body_q_np) -> None:
         rz = (1.0 - 2.0 * (qx * qx + qy * qy)) * z
         return np.array([rx, ry, rz], dtype=np.float64)
 
-    for path, info in rod_info.items():
+    for info in rod_info.values():
         body_ids = info["body_indices"]
         half_lengths = info["half_lengths"]
         edges_list = info["edges_list"]
@@ -269,10 +265,7 @@ def sync_visual_curves(stage: Usd.Stage, rod_info: dict, body_q_np) -> None:
             if not indices_attr or not indices_attr.HasAuthoredValue():
                 continue
             indices = list(indices_attr.Get())
-            new_pts = Vt.Vec3fArray([
-                (float(node_pos[i, 0]), float(node_pos[i, 1]), float(node_pos[i, 2]))
-                for i in indices
-            ])
+            new_pts = Vt.Vec3fArray([(float(node_pos[i, 0]), float(node_pos[i, 1]), float(node_pos[i, 2])) for i in indices])
             child.GetAttribute("points").Set(new_pts)
             new_widths = Vt.FloatArray([float(node_radius[i] * 2.0) for i in indices])
             child.GetAttribute("widths").Set(new_widths)
@@ -280,7 +273,6 @@ def sync_visual_curves(stage: Usd.Stage, rod_info: dict, body_q_np) -> None:
 
 def _pin_rod_node(builder: newton.ModelBuilder, info: dict, node_idx: int) -> set[int]:
     """Make every rod segment body incident to node_idx kinematic/static."""
-    body_ids = info["body_indices"]
     n_nodes = len(info["positions"])
 
     if node_idx < 0 or node_idx >= n_nodes:
@@ -288,6 +280,7 @@ def _pin_rod_node(builder: newton.ModelBuilder, info: dict, node_idx: int) -> se
 
     try:
         from newton._src.sim.enums import BodyFlags
+
         kinematic_flag = int(BodyFlags.KINEMATIC)
     except Exception:
         kinematic_flag = None
@@ -316,11 +309,7 @@ def _incident_rod_bodies(info: dict, node_idx: int) -> list[int]:
     if node_idx < 0 or node_idx >= n_nodes:
         raise ValueError(f"node index {node_idx} outside rod node range [0, {n_nodes})")
 
-    return [
-        body_ids[e_idx]
-        for e_idx, (u, v) in enumerate(edges_list)
-        if e_idx < len(body_ids) and (u == node_idx or v == node_idx)
-    ]
+    return [body_ids[e_idx] for e_idx, (u, v) in enumerate(edges_list) if e_idx < len(body_ids) and (u == node_idx or v == node_idx)]
 
 
 def _broadcast_array(values, count: int, default_factory, attr_name: str):
@@ -339,8 +328,7 @@ def _gf_quat_to_wp(q) -> wp.quat:
     return wp.quat(float(im[0]), float(im[1]), float(im[2]), float(q.GetReal()))
 
 
-def parse_attachments(stage: Usd.Stage, builder: newton.ModelBuilder,
-                      rod_info: dict, body_index_map: dict) -> None:
+def parse_attachments(stage: Usd.Stage, builder: newton.ModelBuilder, rod_info: dict, body_index_map: dict) -> None:
     """Parse NewtonRodAttachmentAPI children and add body or world attachments."""
 
     for prim in stage.Traverse():
@@ -449,9 +437,9 @@ def parse_attachments(stage: Usd.Stage, builder: newton.ModelBuilder,
 # Main simulation class
 # ---------------------------------------------------------------------------
 
+
 class RodSimulation:
-    def __init__(self, usd_path: str, viewer, num_steps: int = 200,
-                 substeps: int = 10, iterations: int = 5, fps: int = 60):
+    def __init__(self, usd_path: str, viewer, num_steps: int = 200, substeps: int = 10, iterations: int = 5, fps: int = 60):
         self.viewer = viewer
         # Start paused so the user can inspect the scene before simulation begins
         if hasattr(viewer, "_paused"):
@@ -472,8 +460,7 @@ class RodSimulation:
 
         builder = newton.ModelBuilder()
         builder.rigid_gap = 0.001
-        builder.add_ground_plane(height=-0.1,cfg = newton.ModelBuilder.ShapeConfig(ke=1e5,
-                                                                                    kd=1.0, mu=1000.0))
+        builder.add_ground_plane(height=-0.1, cfg=newton.ModelBuilder.ShapeConfig(ke=1e5, kd=1.0, mu=1000.0))
 
         # First pass: load rigid bodies, joints, and shapes via add_usd.
         # This gives us real bodies with collision + visual shapes.
@@ -565,6 +552,7 @@ class RodSimulation:
         if not hasattr(self.viewer, "set_camera"):
             return
         import math
+
         all_pts = []
         for info in rod_info.values():
             all_pts.extend(info["positions"])
@@ -576,7 +564,7 @@ class RodSimulation:
         cx = (min(xs) + max(xs)) / 2
         cy = (min(ys) + max(ys)) / 2
         cz = (min(zs) + max(zs)) / 2
-        span = max(max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs), 0.1)
+        span = max(max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs), 0.1)
         dist = span * 2.5
         # Camera placed at -Y, looking toward +Y (yaw=0°), slightly above target
         cam_pos = wp.vec3(cx, cy - dist, cz + dist * 0.3)
@@ -599,9 +587,7 @@ class RodSimulation:
             self.state_0.clear_forces()
             self.viewer.apply_forces(self.state_0)
             self.model.collide(self.state_0, self.contacts)
-            self.solver.step(
-                self.state_0, self.state_1, self.control, self.contacts, self.sim_dt
-            )
+            self.solver.step(self.state_0, self.state_1, self.control, self.contacts, self.sim_dt)
             self.state_0, self.state_1 = self.state_1, self.state_0
 
     def step(self):
@@ -651,10 +637,9 @@ class RodSimulation:
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="Simulate rod/cable USD assets using Newton physics."
-    )
+    parser = argparse.ArgumentParser(description="Simulate rod/cable USD assets using Newton physics.")
     parser.add_argument("usd_file", help="Path to the .usda / .usd file")
     args = parser.parse_args()
 

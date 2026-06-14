@@ -359,9 +359,7 @@ class TestNewtonRodAttachmentAPI(unittest.TestCase):
     def test_multiple_node_indices_one_attachment(self):
         self.attach.ApplyAPI("NewtonRodAttachmentAPI")
         self.attach.GetAttribute("newton:nodeIndices").Set(Vt.IntArray([0, 1, 2]))
-        self.attach.GetAttribute("newton:localPos1").Set(
-            Vt.Vec3fArray([Gf.Vec3f(-0.02, 0, 0), Gf.Vec3f(0, 0, 0), Gf.Vec3f(0.02, 0, 0)])
-        )
+        self.attach.GetAttribute("newton:localPos1").Set(Vt.Vec3fArray([Gf.Vec3f(-0.02, 0, 0), Gf.Vec3f(0, 0, 0), Gf.Vec3f(0.02, 0, 0)]))
 
         self.assertEqual(list(self.attach.GetAttribute("newton:nodeIndices").Get()), [0, 1, 2])
         self.assertEqual(len(self.attach.GetAttribute("newton:localPos1").Get()), 3)
