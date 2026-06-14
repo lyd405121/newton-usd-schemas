@@ -1,5 +1,6 @@
 #usda 1.0
 (
+    defaultPrim = "World"
     doc = """Test: Cable harness graph with 4 attachments — each connector is a cube
     with its own articulated joint connecting to a wall mount.
 
@@ -20,16 +21,12 @@
       - Mixed joint types: 3x revolute + 1x prismatic
       - non-identity localRot1 on ConnectorC slot (body rotated 90° around Z)
       - localPos1 socket offsets on connectors"""
-    defaultPrim = "World"
     metersPerUnit = 1
     upAxis = "Z"
 )
 
 def Xform "World"
 {
-    # ---- Assembly 0: WallMount (static) --revolute Y--> MountCube ----
-    # Cable trunk root (node 0) attaches here. The cube can swing ±30° around Y.
-
     def Xform "Assembly0" (
         prepend apiSchemas = ["PhysicsArticulationRootAPI"]
     )
@@ -38,20 +35,20 @@ def Xform "World"
             prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
         )
         {
+            bool physics:kinematicEnabled = 1
             double size = 0.04
-            double3 xformOp:translate = (-0.30, 0.0, 0.56)
+            double3 xformOp:translate = (-0.3, 0, 0.56)
             uniform token[] xformOpOrder = ["xformOp:translate"]
-            bool physics:kinematicEnabled = true
         }
 
         def Cube "MountCube" (
             prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
         )
         {
-            double size = 0.03
-            double3 xformOp:translate = (-0.30, 0.0, 0.50)
-            uniform token[] xformOpOrder = ["xformOp:translate"]
             float physics:mass = 0.02
+            double size = 0.03
+            double3 xformOp:translate = (-0.3, 0, 0.5)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
         }
 
         def PhysicsRevoluteJoint "RevJoint0"
@@ -59,17 +56,14 @@ def Xform "World"
             uniform token physics:axis = "Y"
             rel physics:body0 = </World/Assembly0/WallMount>
             rel physics:body1 = </World/Assembly0/MountCube>
-            point3f physics:localPos0 = (0.0, 0.0, -0.03)
-            point3f physics:localPos1 = (0.0, 0.0,  0.0)
+            point3f physics:localPos0 = (0, 0, -0.03)
+            point3f physics:localPos1 = (0, 0, 0)
             quatf physics:localRot0 = (1, 0, 0, 0)
             quatf physics:localRot1 = (1, 0, 0, 0)
-            float physics:lowerLimit = -30.0
-            float physics:upperLimit =  30.0
+            float physics:lowerLimit = -30
+            float physics:upperLimit = 30
         }
     }
-
-    # ---- Assembly A: SlotA (static) --revolute Z--> ConnectorA ----
-    # Branch A tip (node 9). Connector can rotate ±45° around Z.
 
     def Xform "AssemblyA" (
         prepend apiSchemas = ["PhysicsArticulationRootAPI"]
@@ -79,20 +73,20 @@ def Xform "World"
             prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
         )
         {
+            bool physics:kinematicEnabled = 1
             double size = 0.04
-            double3 xformOp:translate = (-0.10, 0.28, 0.38)
+            double3 xformOp:translate = (-0.1, 0.28, 0.38)
             uniform token[] xformOpOrder = ["xformOp:translate"]
-            bool physics:kinematicEnabled = true
         }
 
         def Cube "ConnectorA" (
             prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
         )
         {
-            double size = 0.025
-            double3 xformOp:translate = (-0.10, 0.24, 0.44)
-            uniform token[] xformOpOrder = ["xformOp:translate"]
             float physics:mass = 0.02
+            double size = 0.025
+            double3 xformOp:translate = (-0.1, 0.24, 0.44)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
         }
 
         def PhysicsRevoluteJoint "RevJointA"
@@ -100,17 +94,14 @@ def Xform "World"
             uniform token physics:axis = "Z"
             rel physics:body0 = </World/AssemblyA/SlotA>
             rel physics:body1 = </World/AssemblyA/ConnectorA>
-            point3f physics:localPos0 = (0.0, -0.02, 0.03)
-            point3f physics:localPos1 = (0.0,  0.0,  0.0)
+            point3f physics:localPos0 = (0, -0.02, 0.03)
+            point3f physics:localPos1 = (0, 0, 0)
             quatf physics:localRot0 = (1, 0, 0, 0)
             quatf physics:localRot1 = (1, 0, 0, 0)
-            float physics:lowerLimit = -45.0
-            float physics:upperLimit =  45.0
+            float physics:lowerLimit = -45
+            float physics:upperLimit = 45
         }
     }
-
-    # ---- Assembly B: SlotB (static) --prismatic Z--> ConnectorB ----
-    # Branch B tip (node 12). Connector slides ±0.04m along Z (spring-loaded socket).
 
     def Xform "AssemblyB" (
         prepend apiSchemas = ["PhysicsArticulationRootAPI"]
@@ -120,20 +111,20 @@ def Xform "World"
             prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
         )
         {
+            bool physics:kinematicEnabled = 1
             double size = 0.04
-            double3 xformOp:translate = (-0.10, -0.28, 0.38)
+            double3 xformOp:translate = (-0.1, -0.28, 0.38)
             uniform token[] xformOpOrder = ["xformOp:translate"]
-            bool physics:kinematicEnabled = true
         }
 
         def Cube "ConnectorB" (
             prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
         )
         {
-            double size = 0.025
-            double3 xformOp:translate = (-0.10, -0.24, 0.44)
-            uniform token[] xformOpOrder = ["xformOp:translate"]
             float physics:mass = 0.02
+            double size = 0.025
+            double3 xformOp:translate = (-0.1, -0.24, 0.44)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
         }
 
         def PhysicsPrismaticJoint "PrisJointB"
@@ -141,17 +132,14 @@ def Xform "World"
             uniform token physics:axis = "Z"
             rel physics:body0 = </World/AssemblyB/SlotB>
             rel physics:body1 = </World/AssemblyB/ConnectorB>
-            point3f physics:localPos0 = (0.0, 0.0, 0.03)
-            point3f physics:localPos1 = (0.0, 0.0, 0.0)
+            point3f physics:localPos0 = (0, 0, 0.03)
+            point3f physics:localPos1 = (0, 0, 0)
             quatf physics:localRot0 = (1, 0, 0, 0)
             quatf physics:localRot1 = (1, 0, 0, 0)
             float physics:lowerLimit = -0.04
-            float physics:upperLimit =  0.04
+            float physics:upperLimit = 0.04
         }
     }
-
-    # ---- Assembly C: SlotC (static) --revolute X--> ConnectorC ----
-    # Branch C tip (node 15). Body rotated 90° around Z, connector swings ±30° around X.
 
     def Xform "AssemblyC" (
         prepend apiSchemas = ["PhysicsArticulationRootAPI"]
@@ -161,22 +149,22 @@ def Xform "World"
             prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
         )
         {
+            bool physics:kinematicEnabled = 1
             double size = 0.04
-            quatf xformOp:orient = (0.70710677, 0.0, 0.0, 0.70710677)
-            double3 xformOp:translate = (0.20, 0.28, 0.38)
+            quatf xformOp:orient = (0.70710677, 0, 0, 0.70710677)
+            double3 xformOp:translate = (0.2, 0.28, 0.38)
             uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
-            bool physics:kinematicEnabled = true
         }
 
         def Cube "ConnectorC" (
             prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsCollisionAPI"]
         )
         {
-            double size = 0.025
-            quatf xformOp:orient = (0.70710677, 0.0, 0.0, 0.70710677)
-            double3 xformOp:translate = (0.20, 0.24, 0.44)
-            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
             float physics:mass = 0.02
+            double size = 0.025
+            quatf xformOp:orient = (0.70710677, 0, 0, 0.70710677)
+            double3 xformOp:translate = (0.2, 0.24, 0.44)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
         }
 
         def PhysicsRevoluteJoint "RevJointC"
@@ -184,177 +172,140 @@ def Xform "World"
             uniform token physics:axis = "X"
             rel physics:body0 = </World/AssemblyC/SlotC>
             rel physics:body1 = </World/AssemblyC/ConnectorC>
-            point3f physics:localPos0 = (0.0, -0.02, 0.03)
-            point3f physics:localPos1 = (0.0,  0.0,  0.0)
+            point3f physics:localPos0 = (0, -0.02, 0.03)
+            point3f physics:localPos1 = (0, 0, 0)
             quatf physics:localRot0 = (1, 0, 0, 0)
             quatf physics:localRot1 = (1, 0, 0, 0)
-            float physics:lowerLimit = -30.0
-            float physics:upperLimit =  30.0
+            float physics:lowerLimit = -30
+            float physics:upperLimit = 30
         }
     }
 
-    # ---- Cable harness (double-Y graph) ----
-
-    def Xform "rod_graph"
+    def Xform "rod_graph" (
+        prepend apiSchemas = ["NewtonRodAPI", "MaterialBindingAPI"]
+    )
     {
-        def Xform "curve_0" (
-            prepend apiSchemas = ["NewtonRodAPI", "MaterialBindingAPI"]
+        rel material:binding = </World/Looks/CablePhysicsMaterial> (
+            bindMaterialAs = "weakerThanDescendants"
+        )
+        float[] newton:bendDamping = [0.002, 0.002, 0.002, 0.002, 0.002, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+        float[] newton:bendStiffness = [5000, 5000, 5000, 5000, 5000, 5000, 1000, 500, 200, 1000, 500, 200, 1000, 500, 200]
+        float newton:contact_kd = 1
+        float newton:contact_ke = 100
+        int2[] newton:edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (2, 7), (7, 8), (8, 9), (2, 10), (10, 11), (11, 12), (5, 13), (13, 14), (14, 15)]
+        point3f[] newton:points = [(-0.3, 0, 0.5), (-0.2, 0, 0.5), (-0.1, 0, 0.5), (0, 0, 0.5), (0.1, 0, 0.5), (0.2, 0, 0.5), (0.3, 0, 0.5), (-0.1, 0.08, 0.485), (-0.1, 0.16, 0.465), (-0.1, 0.24, 0.44), (-0.1, -0.08, 0.485), (-0.1, -0.16, 0.465), (-0.1, -0.24, 0.44), (0.2, 0.08, 0.485), (0.2, 0.16, 0.465), (0.2, 0.24, 0.44)]
+        float[] newton:radius = [0.005]
+        float[] newton:stretchDamping = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        float[] newton:stretchStiffness = [300000, 300000, 300000, 300000, 300000, 300000, 150000, 100000, 80000, 150000, 100000, 80000, 150000, 100000, 80000]
+        bool newton:wrapInArticulation = 1
+
+        def BasisCurves "visual_trunk" (
+            prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
         )
         {
-            rel material:binding = </World/Looks/CablePhysicsMaterial> (
-                bindMaterialAs = "weakerThanDescendants"
-            )
-            point3f[] newton:points = [(-0.30000, 0.00000, 0.50000),
-                (-0.20000, 0.00000, 0.50000),
-                (-0.10000, 0.00000, 0.50000),
-                ( 0.00000, 0.00000, 0.50000),
-                ( 0.10000, 0.00000, 0.50000),
-                ( 0.20000, 0.00000, 0.50000),
-                ( 0.30000, 0.00000, 0.50000),
-                (-0.10000, 0.08000, 0.48500),
-                (-0.10000, 0.16000, 0.46500),
-                (-0.10000, 0.24000, 0.44000),
-                (-0.10000,-0.08000, 0.48500),
-                (-0.10000,-0.16000, 0.46500),
-                (-0.10000,-0.24000, 0.44000),
-                ( 0.20000, 0.08000, 0.48500),
-                ( 0.20000, 0.16000, 0.46500),
-                ( 0.20000, 0.24000, 0.44000)]
-            float[] newton:radius = [0.00500]
-            float newton:contact_ke = 100.0
-            float newton:contact_kd = 1.0
-            int2[] newton:edges = [
-                (0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6),
-                (2, 7), (7, 8), (8, 9),
-                (2, 10), (10, 11), (11, 12),
-                (5, 13), (13, 14), (14, 15)
-            ]
-            int[] newton:fixedPoints = []
-            float[] newton:stretchStiffness = [300000.0, 300000.0, 300000.0, 300000.0, 300000.0, 300000.0, 150000.0, 100000.0, 80000.0, 150000.0, 100000.0, 80000.0, 150000.0, 100000.0, 80000.0]
-            float[] newton:stretchDamping = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-            float[] newton:bendStiffness = [5000.0, 5000.0, 5000.0, 5000.0, 5000.0, 5000.0, 1000.0, 500.0, 200.0, 1000.0, 500.0, 200.0, 1000.0, 500.0, 200.0]
-            float[] newton:bendDamping = [0.002, 0.002, 0.002, 0.002, 0.002, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
-            bool newton:wrapInArticulation = true
-            # node 0 → MountCube (revolute Y, ±30°)
-            # node 9 → ConnectorA (revolute Z, ±45°) — socket depth 5mm
-            # node 12 → ConnectorB (prismatic Z, ±0.04m) — socket depth 5mm
-            # node 15 → ConnectorC (revolute X, ±30°, body rotated 90° around Z)
+            uniform token[] curveType = ["linear"]
+            int[] curveVertexCounts = [7]
+            int[] newton:rodPointIndices = [0, 1, 2, 3, 4, 5, 6]
+            point3f[] points = [(-0.3, 0, 0.5), (-0.2, 0, 0.5), (-0.1, 0, 0.5), (0, 0, 0.5), (0.1, 0, 0.5), (0.2, 0, 0.5), (0.3, 0, 0.5)]
+            uniform token type = "linear"
+            float[] widths = [0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+            uniform token wrap = "nonperiodic"
+        }
 
-            def BasisCurves "visual_trunk" (
-                prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
-            ) {
-                uniform token[] curveType = ["linear"]
-                int[] curveVertexCounts = [7]
-                int[] newton:rodPointIndices = [0, 1, 2, 3, 4, 5, 6]
-                uniform token type = "linear"
-                uniform token wrap = "nonperiodic"
-                float[] widths = [0.01000, 0.01000, 0.01000, 0.01000, 0.01000, 0.01000, 0.01000]
-                point3f[] points = [(-0.30000, 0.00000, 0.50000),
-                (-0.20000, 0.00000, 0.50000),
-                (-0.10000, 0.00000, 0.50000),
-                ( 0.00000, 0.00000, 0.50000),
-                ( 0.10000, 0.00000, 0.50000),
-                ( 0.20000, 0.00000, 0.50000),
-                ( 0.30000, 0.00000, 0.50000)]
-            }
-            def BasisCurves "visual_branchA" (
-                prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
-            ) {
-                uniform token[] curveType = ["linear"]
-                int[] curveVertexCounts = [4]
-                int[] newton:rodPointIndices = [2, 7, 8, 9]
-                uniform token type = "linear"
-                uniform token wrap = "nonperiodic"
-                float[] widths = [0.01000, 0.00900, 0.00800, 0.00700]
-                point3f[] points = [(-0.10000, 0.00000, 0.50000),
-                (-0.10000, 0.08000, 0.48500),
-                (-0.10000, 0.16000, 0.46500),
-                (-0.10000, 0.24000, 0.44000)]
-            }
-            def BasisCurves "visual_branchB" (
-                prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
-            ) {
-                uniform token[] curveType = ["linear"]
-                int[] curveVertexCounts = [4]
-                int[] newton:rodPointIndices = [2, 10, 11, 12]
-                uniform token type = "linear"
-                uniform token wrap = "nonperiodic"
-                float[] widths = [0.01000, 0.00900, 0.00800, 0.00700]
-                point3f[] points = [(-0.10000, 0.00000, 0.50000),
-                (-0.10000,-0.08000, 0.48500),
-                (-0.10000,-0.16000, 0.46500),
-                (-0.10000,-0.24000, 0.44000)]
-            }
-            def BasisCurves "visual_branchC" (
-                prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
-            ) {
-                uniform token[] curveType = ["linear"]
-                int[] curveVertexCounts = [4]
-                int[] newton:rodPointIndices = [5, 13, 14, 15]
-                uniform token type = "linear"
-                uniform token wrap = "nonperiodic"
-                float[] widths = [0.01000, 0.00900, 0.00800, 0.00700]
-                point3f[] points = [( 0.20000, 0.00000, 0.50000),
-                ( 0.20000, 0.08000, 0.48500),
-                ( 0.20000, 0.16000, 0.46500),
-                ( 0.20000, 0.24000, 0.44000)]
-            }
+        def BasisCurves "visual_branchA" (
+            prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
+        )
+        {
+            uniform token[] curveType = ["linear"]
+            int[] curveVertexCounts = [4]
+            int[] newton:rodPointIndices = [2, 7, 8, 9]
+            point3f[] points = [(-0.1, 0, 0.5), (-0.1, 0.08, 0.485), (-0.1, 0.16, 0.465), (-0.1, 0.24, 0.44)]
+            uniform token type = "linear"
+            float[] widths = [0.01, 0.009, 0.008, 0.007]
+            uniform token wrap = "nonperiodic"
+        }
 
-            def Xform "attachment_trunk" (
-                prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-            )
-            {
-                int newton:nodeIndex = 0
-                rel newton:body = </World/Assembly0/MountCube>
-                point3f newton:localPos1 = (0.0, 0.0, 0.0)
-                quatf newton:localRot0 = (1, 0, 0, 0)
-                quatf newton:localRot1 = (1, 0, 0, 0)
-            }
+        def BasisCurves "visual_branchB" (
+            prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
+        )
+        {
+            uniform token[] curveType = ["linear"]
+            int[] curveVertexCounts = [4]
+            int[] newton:rodPointIndices = [2, 10, 11, 12]
+            point3f[] points = [(-0.1, 0, 0.5), (-0.1, -0.08, 0.485), (-0.1, -0.16, 0.465), (-0.1, -0.24, 0.44)]
+            uniform token type = "linear"
+            float[] widths = [0.01, 0.009, 0.008, 0.007]
+            uniform token wrap = "nonperiodic"
+        }
 
-            def Xform "attachment_connA" (
-                prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-            )
-            {
-                int newton:nodeIndex = 9
-                rel newton:body = </World/AssemblyA/ConnectorA>
-                point3f newton:localPos1 = (0.0, 0.0, -0.005)
-                quatf newton:localRot0 = (1, 0, 0, 0)
-                quatf newton:localRot1 = (1, 0, 0, 0)
-            }
+        def BasisCurves "visual_branchC" (
+            prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
+        )
+        {
+            uniform token[] curveType = ["linear"]
+            int[] curveVertexCounts = [4]
+            int[] newton:rodPointIndices = [5, 13, 14, 15]
+            point3f[] points = [(0.2, 0, 0.5), (0.2, 0.08, 0.485), (0.2, 0.16, 0.465), (0.2, 0.24, 0.44)]
+            uniform token type = "linear"
+            float[] widths = [0.01, 0.009, 0.008, 0.007]
+            uniform token wrap = "nonperiodic"
+        }
 
-            def Xform "attachment_connB" (
-                prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-            )
-            {
-                int newton:nodeIndex = 12
-                rel newton:body = </World/AssemblyB/ConnectorB>
-                point3f newton:localPos1 = (0.0, 0.0, -0.005)
-                quatf newton:localRot0 = (1, 0, 0, 0)
-                quatf newton:localRot1 = (1, 0, 0, 0)
-            }
+        def Xform "attachment_trunk" (
+            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
+        )
+        {
+            rel newton:body = </World/Assembly0/MountCube>
+            point3f[] newton:localPos1 = [(0, 0, 0)]
+            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
+            quatf[] newton:localRot1 = [(1, 0, 0, 0)]
+            int[] newton:nodeIndices = [0]
+        }
 
-            def Xform "attachment_connC" (
-                prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-            )
-            {
-                int newton:nodeIndex = 15
-                rel newton:body = </World/AssemblyC/ConnectorC>
-                point3f newton:localPos1 = (0.0, 0.0, -0.005)
-                quatf newton:localRot0 = (1, 0, 0, 0)
-                quatf newton:localRot1 = (0.70710677, 0.0, 0.0, -0.70710677)
-            }
+        def Xform "attachment_connA" (
+            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
+        )
+        {
+            rel newton:body = </World/AssemblyA/ConnectorA>
+            point3f[] newton:localPos1 = [(0, 0, -0.005)]
+            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
+            quatf[] newton:localRot1 = [(1, 0, 0, 0)]
+            int[] newton:nodeIndices = [9]
+        }
+
+        def Xform "attachment_connB" (
+            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
+        )
+        {
+            rel newton:body = </World/AssemblyB/ConnectorB>
+            point3f[] newton:localPos1 = [(0, 0, -0.005)]
+            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
+            quatf[] newton:localRot1 = [(1, 0, 0, 0)]
+            int[] newton:nodeIndices = [12]
+        }
+
+        def Xform "attachment_connC" (
+            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
+        )
+        {
+            rel newton:body = </World/AssemblyC/ConnectorC>
+            point3f[] newton:localPos1 = [(0, 0, -0.005)]
+            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
+            quatf[] newton:localRot1 = [(0.70710677, 0, 0, -0.70710677)]
+            int[] newton:nodeIndices = [15]
         }
     }
+
     def Scope "Looks"
     {
         def Material "CablePhysicsMaterial" (
             prepend apiSchemas = ["PhysicsMaterialAPI", "NewtonMaterialAPI"]
         )
         {
+            float newton:contactDamping = 1
+            float newton:contactStiffness = 100
             float physics:dynamicFriction = 0.5
             float physics:staticFriction = 0.5
-            float newton:contactStiffness = 100.0
-            float newton:contactDamping = 1.0
         }
     }
 }

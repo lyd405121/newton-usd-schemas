@@ -546,7 +546,8 @@ def write_multi_char_usda(
 
     Each character prim contains:
       - newton:points / newton:radius  (physics geometry)
-      - newton:edges / newton:fixedPoints / stiffness attrs
+      - newton:edges / stiffness attrs
+      - NewtonRodAttachmentAPI child prim pinning the top node to world
       - def BasisCurves "visual"  (rendering only)
     """
     # Uniform scale: all chars rendered at pixel_height rows
@@ -595,7 +596,7 @@ def write_multi_char_usda(
 
         world_pts = [px_to_world(r, c) for r, c in nodes]
 
-        # Fixed point: 只固定最顶端的一个节点
+        # World attachment: pin the top-most node.
         all_rows = [r for r, c in nodes]
         top_row = min(all_rows)
         fixed_idx = next(i for i, (r, c) in enumerate(nodes) if r == top_row)
@@ -604,7 +605,6 @@ def write_multi_char_usda(
         pts_str = ", ".join(f"({p[0]:.5f}, {p[1]:.5f}, {p[2]:.5f})" for p in world_pts)
         widths_str = ", ".join([f"{rod_width:.4f}"] * n_nodes)
         edges_str = ", ".join(f"({a}, {b})" for a, b in edges)
-        fp_str = str(fixed_idx)
         safe_ch = ch.replace('\\', '\\\\').replace('"', '\\"')
 
         lines.append(f'        def Xform "curve_{curve_idx}" (  # character \'{safe_ch}\'')
@@ -620,7 +620,6 @@ def write_multi_char_usda(
         lines.append(f'            float newton:contact_kd = {contact_kd}')
         lines.append('')
         lines.append(f'            int2[] newton:edges = [{edges_str}]')
-        lines.append(f'            int[] newton:fixedPoints = [{fp_str}]')
         lines.append('')
         lines.append(f'            float[] newton:stretchStiffness = [{stretch_stiffness}]')
         lines.append(f'            float[] newton:stretchDamping = [{stretch_damping}]')
@@ -651,6 +650,12 @@ def write_multi_char_usda(
             lines.append(f'                float[] widths = [{s_widths_str}]')
             lines.append(f'                point3f[] points = [{s_pts_str}]')
             lines.append('            }')
+        lines.append('')
+        lines.append(f'            def Xform "attach_world_{fixed_idx}" (')
+        lines.append('                prepend apiSchemas = ["NewtonRodAttachmentAPI"]')
+        lines.append('            ) {')
+        lines.append(f'                int[] newton:nodeIndices = [{fixed_idx}]')
+        lines.append('            }')
         lines.append('        }')
 
         x_offset += char_world_width + char_gap
@@ -777,4 +782,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

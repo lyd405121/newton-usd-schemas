@@ -111,14 +111,13 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
         positions = [wp.vec3(float(p[0]), float(p[1]), float(p[2])) for p in pts_raw]
         n_nodes = len(positions)
 
-        # Resolve edges early so we know n_edges for radius expansion
+        # Resolve required graph topology early so we know n_edges for radius expansion.
         edges_raw = prim.GetAttribute("newton:edges").Get()
         if edges_raw and len(edges_raw) > 0:
             edges = [(int(e[0]), int(e[1])) for e in edges_raw]
             n_edges = len(edges)
         else:
-            edges = None
-            n_edges = max(0, n_nodes - 1)
+            raise RuntimeError(f"{path}: missing required non-empty newton:edges")
 
         # Expand newton:radius to per-segment list
         DEFAULT_RADIUS = 0.005
@@ -140,60 +139,34 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
             print(f"         radius capped: {(radii[0] if radii else DEFAULT_RADIUS)*1000:.2f}mm → {rep_radius*1000:.2f}mm  (seg_len={seg_len*1000:.2f}mm)")
 
         # --- physics attributes ---
-        fp_raw   = prim.GetAttribute("newton:fixedPoints").Get() or []
         ss_raw   = prim.GetAttribute("newton:stretchStiffness").Get()
         sd_raw   = prim.GetAttribute("newton:stretchDamping").Get()
         bs_raw   = prim.GetAttribute("newton:bendStiffness").Get()
         bd_raw   = prim.GetAttribute("newton:bendDamping").Get()
         wrap_art = prim.GetAttribute("newton:wrapInArticulation").Get()
-        closed   = prim.GetAttribute("newton:closed").Get() or False
 
         wrap = bool(wrap_art) if wrap_art is not None else True
 
         cfg = newton.ModelBuilder.ShapeConfig()
 
-        # --- build rod ---
-        if edges is not None:
-            # Graph topology via add_rod_graph
-            stretch_stiffness = _scalar_or_uniform(ss_raw, 1e5)
-            stretch_damping   = _scalar_or_uniform(sd_raw, 0.0)
-            bend_stiffness    = _scalar_or_uniform(bs_raw, 0.0)
-            bend_damping      = _scalar_or_uniform(bd_raw, 0.0)
+        stretch_stiffness = _scalar_or_uniform(ss_raw, 1e5)
+        stretch_damping   = _scalar_or_uniform(sd_raw, 0.0)
+        bend_stiffness    = _scalar_or_uniform(bs_raw, 0.0)
+        bend_damping      = _scalar_or_uniform(bd_raw, 0.0)
 
-            print(f"[rod] {path}: add_rod_graph  nodes={n_nodes}  edges={n_edges}  radius={rep_radius:.4f}")
-            body_ids, joint_ids = builder.add_rod_graph(
-                node_positions=positions,
-                edges=edges,
-                radius=rep_radius,
-                cfg=cfg,
-                stretch_stiffness=stretch_stiffness,
-                stretch_damping=stretch_damping,
-                bend_stiffness=bend_stiffness,
-                bend_damping=bend_damping,
-                wrap_in_articulation=wrap,
-                label=path.replace("/", "_"),
-            )
-        else:
-            # Linear chain via add_rod
-            n_segments = n_nodes - 1
-            stretch_stiffness = _scalar_or_uniform(ss_raw, 1e5)
-            stretch_damping   = _scalar_or_uniform(sd_raw, 0.0)
-            bend_stiffness    = _scalar_or_uniform(bs_raw, 0.0)
-            bend_damping      = _scalar_or_uniform(bd_raw, 0.0)
-
-            print(f"[rod] {path}: add_rod  nodes={n_nodes}  segments={n_segments}  radius={rep_radius:.4f}")
-            body_ids, joint_ids = builder.add_rod(
-                positions=positions,
-                radius=rep_radius,
-                cfg=cfg,
-                stretch_stiffness=stretch_stiffness,
-                stretch_damping=stretch_damping,
-                bend_stiffness=bend_stiffness,
-                bend_damping=bend_damping,
-                closed=closed,
-                wrap_in_articulation=wrap,
-                label=path.replace("/", "_"),
-            )
+        print(f"[rod] {path}: add_rod_graph  nodes={n_nodes}  edges={n_edges}  radius={rep_radius:.4f}")
+        body_ids, joint_ids = builder.add_rod_graph(
+            node_positions=positions,
+            edges=edges,
+            radius=rep_radius,
+            cfg=cfg,
+            stretch_stiffness=stretch_stiffness,
+            stretch_damping=stretch_damping,
+            bend_stiffness=bend_stiffness,
+            bend_damping=bend_damping,
+            wrap_in_articulation=wrap,
+            label=path.replace("/", "_"),
+        )
 
         print(f"         bodies={len(body_ids)}  joints={len(joint_ids)}")
 
@@ -205,55 +178,12 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                         builder.add_shape_collision_filter_pair(int(shape_a), int(shape_b))
         print(f"         self-collision pairs filtered: {len(body_ids)*(len(body_ids)-1)//2}")
 
-        # --- fixed points (kinematic) ---
-        if fp_raw:
-            try:
-                from newton._src.sim.enums import BodyFlags
-                kinematic_flag = int(BodyFlags.KINEMATIC)
-            except Exception:
-                kinematic_flag = None
-
-            pinned: set[int] = set()
-            if edges is not None:
-                # Graph topology
-                fixed_nodes = {int(pt) for pt in fp_raw}
-                for e_idx, (u, v) in enumerate(edges):
-                    if u in fixed_nodes or v in fixed_nodes:
-                        if e_idx < len(body_ids):
-                            pinned.add(body_ids[e_idx])
-            else:
-                # Linear chain: body_ids[i] spans from node i to node i+1.
-                # A fixed node pins the bodies on both sides of that node.
-                for pt_idx in fp_raw:
-                    pt_idx = int(pt_idx)
-                    if pt_idx < len(body_ids):
-                        pinned.add(body_ids[pt_idx])
-                    if pt_idx > 0 and (pt_idx - 1) < len(body_ids):
-                        pinned.add(body_ids[pt_idx - 1])
-
-            for b in pinned:
-                builder.body_mass[b] = 0.0
-                builder.body_inv_mass[b] = 0.0
-                builder.body_inertia[b] = wp.mat33(0.0)
-                builder.body_inv_inertia[b] = wp.mat33(0.0)
-                if kinematic_flag is not None and hasattr(builder, "body_flags"):
-                    builder.body_flags[b] = kinematic_flag
-
-            print(f"         fixedPoints={list(fp_raw)}  pinned {len(pinned)} bodies")
-
         # Segment half-lengths and edges_list for visual sync
-        if edges is not None:
-            edges_list = edges
-            half_lengths = [
-                float(wp.length(positions[v] - positions[u])) / 2.0
-                for u, v in edges_list
-            ]
-        else:
-            edges_list = [(i, i + 1) for i in range(n_nodes - 1)]
-            half_lengths = [
-                float(wp.length(positions[i + 1] - positions[i])) / 2.0
-                for i in range(n_nodes - 1)
-            ]
+        edges_list = edges
+        half_lengths = [
+            float(wp.length(positions[v] - positions[u])) / 2.0
+            for u, v in edges_list
+        ]
 
         rod_info[path] = {
             "body_indices": body_ids,
@@ -348,9 +278,70 @@ def sync_visual_curves(stage: Usd.Stage, rod_info: dict, body_q_np) -> None:
             child.GetAttribute("widths").Set(new_widths)
 
 
+def _pin_rod_node(builder: newton.ModelBuilder, info: dict, node_idx: int) -> set[int]:
+    """Make every rod segment body incident to node_idx kinematic/static."""
+    body_ids = info["body_indices"]
+    n_nodes = len(info["positions"])
+
+    if node_idx < 0 or node_idx >= n_nodes:
+        raise ValueError(f"node index {node_idx} outside rod node range [0, {n_nodes})")
+
+    try:
+        from newton._src.sim.enums import BodyFlags
+        kinematic_flag = int(BodyFlags.KINEMATIC)
+    except Exception:
+        kinematic_flag = None
+
+    pinned: set[int] = set()
+    for body_id in _incident_rod_bodies(info, node_idx):
+        pinned.add(body_id)
+
+    for body_id in pinned:
+        builder.body_mass[body_id] = 0.0
+        builder.body_inv_mass[body_id] = 0.0
+        builder.body_inertia[body_id] = wp.mat33(0.0)
+        builder.body_inv_inertia[body_id] = wp.mat33(0.0)
+        if kinematic_flag is not None and hasattr(builder, "body_flags"):
+            builder.body_flags[body_id] = kinematic_flag
+
+    return pinned
+
+
+def _incident_rod_bodies(info: dict, node_idx: int) -> list[int]:
+    """Return rod segment bodies incident to a rod node."""
+    body_ids = info["body_indices"]
+    edges_list = info["edges_list"]
+    n_nodes = len(info["positions"])
+
+    if node_idx < 0 or node_idx >= n_nodes:
+        raise ValueError(f"node index {node_idx} outside rod node range [0, {n_nodes})")
+
+    return [
+        body_ids[e_idx]
+        for e_idx, (u, v) in enumerate(edges_list)
+        if e_idx < len(body_ids) and (u == node_idx or v == node_idx)
+    ]
+
+
+def _broadcast_array(values, count: int, default_factory, attr_name: str):
+    """Return count values from an optional USD array using empty/one/count semantics."""
+    if values is None or len(values) == 0:
+        return [default_factory() for _ in range(count)]
+    if len(values) == 1:
+        return [values[0] for _ in range(count)]
+    if len(values) == count:
+        return list(values)
+    raise ValueError(f"{attr_name} length {len(values)} must be 0, 1, or {count}")
+
+
+def _gf_quat_to_wp(q) -> wp.quat:
+    im = q.GetImaginary()
+    return wp.quat(float(im[0]), float(im[1]), float(im[2]), float(q.GetReal()))
+
+
 def parse_attachments(stage: Usd.Stage, builder: newton.ModelBuilder,
                       rod_info: dict, body_index_map: dict) -> None:
-    """Parse NewtonRodAttachmentAPI children and add fixed joints."""
+    """Parse NewtonRodAttachmentAPI children and add body or world attachments."""
 
     for prim in stage.Traverse():
         if not prim.HasAPI("NewtonRodAPI"):
@@ -361,26 +352,33 @@ def parse_attachments(stage: Usd.Stage, builder: newton.ModelBuilder,
         if info is None:
             continue
 
-        body_ids = info["body_indices"]
-
         for child in prim.GetChildren():
             if not child.HasAPI("NewtonRodAttachmentAPI"):
                 continue
 
-            node_idx = child.GetAttribute("newton:nodeIndex").Get()
+            node_indices_raw = child.GetAttribute("newton:nodeIndices").Get()
             body_targets = child.GetRelationship("newton:body").GetTargets()
             local_pos1_raw = child.GetAttribute("newton:localPos1").Get()
             local_rot0_raw = child.GetAttribute("newton:localRot0").Get()
             local_rot1_raw = child.GetAttribute("newton:localRot1").Get()
 
-            if node_idx is None:
-                print(f"[warn] {child.GetPath()}: missing newton:nodeIndex, skipping")
-                continue
-            if not body_targets:
-                print(f"[warn] {child.GetPath()}: missing newton:body rel, skipping")
+            if not node_indices_raw:
+                print(f"[warn] {child.GetPath()}: missing newton:nodeIndices, skipping")
                 continue
 
-            node_idx = int(node_idx)
+            node_indices = [int(idx) for idx in node_indices_raw]
+
+            if not body_targets:
+                total_pinned = 0
+                try:
+                    for node_idx in node_indices:
+                        total_pinned += len(_pin_rod_node(builder, info, node_idx))
+                except ValueError as exc:
+                    print(f"[warn] {child.GetPath()}: {exc}, skipping")
+                    continue
+                print(f"[attach] {child.GetName()}: nodes={node_indices} -> world  pinned {total_pinned} bodies")
+                continue
+
             ext_body_path = str(body_targets[0])
             rigid_id = body_index_map.get(ext_body_path)
 
@@ -388,36 +386,63 @@ def parse_attachments(stage: Usd.Stage, builder: newton.ModelBuilder,
                 print(f"[warn] {child.GetPath()}: external body {ext_body_path} not found in builder, skipping")
                 continue
 
-            # rod body index: node_idx maps to body_ids[min(node_idx, len-1)]
-            rod_body_idx = min(node_idx, len(body_ids) - 1)
-            rod_body = body_ids[rod_body_idx]
+            try:
+                local_pos1_values = _broadcast_array(
+                    local_pos1_raw,
+                    len(node_indices),
+                    lambda: None,
+                    "newton:localPos1",
+                )
+                local_rot0_values = _broadcast_array(
+                    local_rot0_raw,
+                    len(node_indices),
+                    lambda: None,
+                    "newton:localRot0",
+                )
+                local_rot1_values = _broadcast_array(
+                    local_rot1_raw,
+                    len(node_indices),
+                    lambda: None,
+                    "newton:localRot1",
+                )
+            except ValueError as exc:
+                print(f"[warn] {child.GetPath()}: {exc}, skipping")
+                continue
 
-            # Build transforms — Gf.Quatf stores (w, xi, yj, zk)
-            if local_pos1_raw is not None:
-                p1 = wp.vec3(float(local_pos1_raw[0]), float(local_pos1_raw[1]), float(local_pos1_raw[2]))
-            else:
-                p1 = wp.vec3(0.0, 0.0, 0.0)
+            added = 0
+            for attach_idx, node_idx in enumerate(node_indices):
+                try:
+                    incident_bodies = _incident_rod_bodies(info, node_idx)
+                except ValueError as exc:
+                    print(f"[warn] {child.GetPath()}: {exc}, skipping node")
+                    continue
 
-            def gf_quat_to_wp(q) -> wp.quat:
-                im = q.GetImaginary()
-                return wp.quat(float(im[0]), float(im[1]), float(im[2]), float(q.GetReal()))
+                rod_node_pos = info["positions"][node_idx]
+                p1_raw = local_pos1_values[attach_idx]
+                if p1_raw is not None:
+                    p1 = wp.vec3(float(p1_raw[0]), float(p1_raw[1]), float(p1_raw[2]))
+                else:
+                    p1 = wp.transform_point(wp.transform_inverse(builder.body_q[rigid_id]), rod_node_pos)
 
-            r0 = gf_quat_to_wp(local_rot0_raw) if local_rot0_raw is not None else wp.quat_identity()
-            r1 = gf_quat_to_wp(local_rot1_raw) if local_rot1_raw is not None else wp.quat_identity()
+                r0_raw = local_rot0_values[attach_idx]
+                r1_raw = local_rot1_values[attach_idx]
+                r0 = _gf_quat_to_wp(r0_raw) if r0_raw is not None else wp.quat_identity()
+                r1 = _gf_quat_to_wp(r1_raw) if r1_raw is not None else wp.quat_identity()
 
-            rod_world_xform = builder.body_q[rod_body]
-            rod_node_pos = info["positions"][node_idx]
-            rod_local_pos = wp.transform_point(wp.transform_inverse(rod_world_xform), rod_node_pos)
+                for rod_body in incident_bodies:
+                    rod_world_xform = builder.body_q[rod_body]
+                    rod_local_pos = wp.transform_point(wp.transform_inverse(rod_world_xform), rod_node_pos)
 
-            builder.add_joint_fixed(
-                parent=rigid_id,
-                child=rod_body,
-                parent_xform=wp.transform(p1, r1),
-                child_xform=wp.transform(rod_local_pos, r0),
-                label=str(child.GetPath()).replace("/", "_"),
-                collision_filter_parent=True,
-            )
-            print(f"[attach] {child.GetName()}: node={node_idx} → body={rod_body}  ext={ext_body_path}")
+                    builder.add_joint_fixed(
+                        parent=rigid_id,
+                        child=rod_body,
+                        parent_xform=wp.transform(p1, r1),
+                        child_xform=wp.transform(rod_local_pos, r0),
+                        label=f"{str(child.GetPath()).replace('/', '_')}_{node_idx}_{rod_body}",
+                        collision_filter_parent=True,
+                    )
+                    added += 1
+            print(f"[attach] {child.GetName()}: nodes={node_indices} -> body={ext_body_path}  joints={added}")
 
 
 # ---------------------------------------------------------------------------
