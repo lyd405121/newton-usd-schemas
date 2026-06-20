@@ -337,6 +337,17 @@ def Xform "World"
                 uniform token physics:type0 = "point"
                 uniform token physics:type1 = "xform"
             }
+
+            def PhysicsElementCollisionFilter "filter_branchC_slotC"
+            {
+                bool physics:filterEnabled = true
+                rel physics:src0 = </World/rod_graph/curve_0/visual_branchC>
+                rel physics:src1 = </World/AssemblyC/SlotC>
+                int[] physics:groupElemCounts0 = [3]
+                int[] physics:groupElemIndices0 = [0, 1, 2]
+                int[] physics:groupElemCounts1 = []
+                int[] physics:groupElemIndices1 = []
+            }
         }
     }
 
