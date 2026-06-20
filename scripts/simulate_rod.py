@@ -21,9 +21,8 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
-# Remove REPO_ROOT from sys.path if present — it contains a newton/ directory
-# that would shadow the conda-installed newton package.
-sys.path = [p for p in sys.path if Path(p).resolve() != REPO_ROOT]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import newton
 import newton.solvers
@@ -105,7 +104,8 @@ def _find_bound_material_prim(prim: Usd.Prim) -> Usd.Prim | None:
     return None
 
 
-def _material_values(mat: Usd.Prim | None) -> dict[str, float]:
+def _curve_material(prim: Usd.Prim) -> dict[str, float]:
+    mat = _find_bound_material_prim(prim)
     out: dict[str, float] = {}
     if mat is None:
         return out
@@ -120,38 +120,6 @@ def _material_values(mat: Usd.Prim | None) -> dict[str, float]:
         if val is not None:
             out[name] = val
     return out
-
-
-def _curve_material(prim: Usd.Prim) -> dict[str, float]:
-    return _material_values(_find_bound_material_prim(prim))
-
-
-def _curve_segment_materials(
-    prim: Usd.Prim,
-    segment_count: int,
-    base_material: dict[str, float],
-) -> list[dict[str, float]]:
-    """Resolve per-segment material values from child GeomSubset bindings."""
-    materials = [dict(base_material) for _ in range(segment_count)]
-    if segment_count <= 0:
-        return materials
-
-    for child in prim.GetChildren():
-        if child.GetTypeName() != "GeomSubset":
-            continue
-        if child.GetAttribute("elementType").Get() != "segment":
-            continue
-        indices = child.GetAttribute("indices").Get() or []
-        subset_material = _curve_material(child)
-        if not subset_material:
-            continue
-        for idx in indices:
-            segment_idx = int(idx)
-            if 0 <= segment_idx < segment_count:
-                materials[segment_idx] = dict(subset_material)
-            else:
-                print(f"[warn] {child.GetPath()}: segment index {segment_idx} outside 0..{segment_count - 1}")
-    return materials
 
 
 def _ancestor_has_api(prim: Usd.Prim, api_name: str) -> bool:
@@ -174,105 +142,13 @@ def _curve_vertex_counts(curves: UsdGeom.BasisCurves, n_points: int) -> list[int
 
 
 def _curve_radius(curves: UsdGeom.BasisCurves, material: dict[str, float]) -> float:
-    return _segment_radius(curves, 0, material, 0.005)
-
-
-def _segment_radius(
-    curves: UsdGeom.BasisCurves,
-    segment_index: int,
-    material: dict[str, float],
-    fallback: float,
-) -> float:
     thickness = material.get("physics:thickness")
     if thickness is not None and thickness > 0.0:
         return 0.5 * thickness
     widths = curves.GetWidthsAttr().Get()
     if widths and len(widths) > 0:
-        width_idx = min(max(segment_index, 0), len(widths) - 1)
-        return max(float(widths[width_idx]) * 0.5, 1.0e-6)
-    return fallback
-
-
-def _average_material(left: dict[str, float], right: dict[str, float]) -> dict[str, float]:
-    out: dict[str, float] = {}
-    for key in set(left) | set(right):
-        a = left.get(key)
-        b = right.get(key)
-        if a is not None and b is not None:
-            out[key] = 0.5 * (a + b)
-        elif a is not None:
-            out[key] = a
-        elif b is not None:
-            out[key] = b
-    return out
-
-
-def _format_range(values: list[float]) -> str:
-    if not values:
-        return "none"
-    return f"{min(values):.4g}..{max(values):.4g}"
-
-
-def _apply_segment_material_overrides(
-    builder: newton.ModelBuilder,
-    body_ids: list[int],
-    joint_ids: list[int],
-    segment_materials: list[dict[str, float]],
-    segment_radii: list[float],
-    label: str,
-) -> list[float]:
-    """Apply GeomSubset segment material values after add_rod/add_rod_graph."""
-    if not body_ids or not segment_radii:
-        return []
-
-    edge_radii = [segment_radii[min(i, len(segment_radii) - 1)] for i in range(len(body_ids))]
-
-    for edge_idx, body_id in enumerate(body_ids):
-        radius = edge_radii[edge_idx]
-        for shape_idx in builder.body_shapes.get(body_id, []):
-            scale = builder.shape_scale[shape_idx]
-            half_height = float(scale[1])
-            builder.shape_scale[shape_idx] = (radius, half_height, radius)
-            builder.shape_collision_radius[shape_idx] = radius + abs(half_height)
-
-    for joint_order, joint_idx in enumerate(joint_ids):
-        if joint_idx < 0 or joint_idx >= len(builder.joint_qd_start):
-            continue
-        left = segment_materials[min(joint_order, len(segment_materials) - 1)] if segment_materials else {}
-        right = segment_materials[min(joint_order + 1, len(segment_materials) - 1)] if segment_materials else left
-        material = _average_material(left, right)
-        dof_start = builder.joint_qd_start[joint_idx]
-        radius = edge_radii[min(joint_order, len(edge_radii) - 1)]
-        # Compute segment length from shape scale (half_height * 2)
-        body_id = body_ids[min(joint_order, len(body_ids) - 1)]
-        seg_len = 0.1  # fallback
-        for shape_idx in builder.body_shapes.get(body_id, []):
-            seg_len = float(builder.shape_scale[shape_idx][1]) * 2.0
-            break
-        from newton._src.utils.cable import create_cable_stiffness_from_elastic_moduli
-        if dof_start < len(builder.joint_target_ke):
-            raw_stretch = material.get("physics:stretchStiffness")
-            if raw_stretch is not None:
-                builder.joint_target_ke[dof_start] = create_cable_stiffness_from_elastic_moduli(raw_stretch, radius, seg_len)[0]
-            builder.joint_target_kd[dof_start] = material.get(
-                "newton:stretchDamping", builder.joint_target_kd[dof_start]
-            )
-        if dof_start + 1 < len(builder.joint_target_ke):
-            raw_bend = material.get("physics:bendStiffness")
-            if raw_bend is not None:
-                builder.joint_target_ke[dof_start + 1] = create_cable_stiffness_from_elastic_moduli(raw_bend, radius, seg_len)[1]
-            builder.joint_target_kd[dof_start + 1] = material.get(
-                "newton:bendDamping", builder.joint_target_kd[dof_start + 1]
-            )
-
-    stretch_values = [m["physics:stretchStiffness"] for m in segment_materials if "physics:stretchStiffness" in m]
-    bend_values = [m["physics:bendStiffness"] for m in segment_materials if "physics:bendStiffness" in m]
-    if len({round(r, 12) for r in edge_radii}) > 1 or len({round(v, 12) for v in stretch_values}) > 1:
-        print(
-            f"[subset] {label}: applied segment overrides "
-            f"radius={_format_range(edge_radii)} stretch={_format_range(stretch_values)} bend={_format_range(bend_values)}"
-        )
-    return edge_radii
+        return max(float(widths[0]) * 0.5, 1.0e-6)
+    return 0.005
 
 
 def _wrap_in_articulation(prim: Usd.Prim) -> bool:
@@ -306,22 +182,11 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
         radius = _curve_radius(curves, material)
         closed = curves.GetWrapAttr().Get() == UsdGeom.Tokens.periodic
         wrap = _wrap_in_articulation(prim)
-        segment_counts = [count if closed else max(count - 1, 0) for count in counts]
-        all_segment_materials = _curve_segment_materials(prim, sum(segment_counts), material)
-        all_segment_radii = [
-            _segment_radius(curves, segment_idx, segment_material, radius)
-            for segment_idx, segment_material in enumerate(all_segment_materials)
-        ]
 
         offset = 0
-        segment_offset = 0
         for curve_index, count in enumerate(counts):
             positions = all_positions[offset : offset + count]
-            segment_count = segment_counts[curve_index]
-            segment_materials = all_segment_materials[segment_offset : segment_offset + segment_count]
-            segment_radii = all_segment_radii[segment_offset : segment_offset + segment_count]
             offset += count
-            segment_offset += segment_count
             if len(positions) < 2:
                 print(f"[warn] {path}[{curve_index}]: need at least 2 curve points, skipping")
                 continue
@@ -333,9 +198,7 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 "curve_index": curve_index,
                 "positions": positions,
                 "material": material,
-                "segment_materials": segment_materials,
-                "segment_radii": segment_radii,
-                "radius": segment_radii[0] if segment_radii else radius,
+                "radius": radius,
                 "closed": closed,
                 "wrap": wrap,
             }
@@ -397,19 +260,8 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 print(f"[warn] {rec['key']}: add_rod requires at least 3 points, skipping")
                 continue
             material = rec["material"]
-            # Convert elastic moduli to joint stiffness using cross-section geometry.
-            # physics:stretchStiffness and bendStiffness are material moduli [Pa],
-            # not joint target_ke directly.
-            radius = rec["radius"]
-            seg_len = sum(
-                float(wp.length(positions[i+1] - positions[i]))
-                for i in range(len(positions)-1)
-            ) / max(len(positions)-1, 1)
-            from newton._src.utils.cable import create_cable_stiffness_from_elastic_moduli
-            raw_stretch = material.get("physics:stretchStiffness", 1.0e5)
-            raw_bend = material.get("physics:bendStiffness", 0.0)
-            stretch_stiffness = create_cable_stiffness_from_elastic_moduli(raw_stretch, radius, seg_len)[0] if raw_stretch else None
-            bend_stiffness = create_cable_stiffness_from_elastic_moduli(raw_bend, radius, seg_len)[1] if raw_bend else None
+            stretch_stiffness = material.get("physics:stretchStiffness", 1.0e5)
+            bend_stiffness = material.get("physics:bendStiffness", 0.0)
             stretch_damping = material.get("newton:stretchDamping", 0.0)
             bend_damping = material.get("newton:bendDamping", 0.0)
             label = rec["key"].replace("/", "_")
@@ -429,49 +281,29 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 wrap_in_articulation=rec["wrap"],
                 label=label,
             )
-            edge_radii = _apply_segment_material_overrides(
-                builder,
-                body_ids,
-                joint_ids,
-                rec["segment_materials"],
-                rec["segment_radii"],
-                rec["key"],
-            )
-            edges = [(i, i + 1) for i in range(len(positions) - 1)]
-            for edge_idx, body_a in enumerate(body_ids):
-                neighbor_indices = [edge_idx - 1, edge_idx + 1]
-                if rec["closed"]:
-                    if edge_idx == 0:
-                        neighbor_indices.append(len(body_ids) - 1)
-                    elif edge_idx == len(body_ids) - 1:
-                        neighbor_indices.append(0)
-                for neighbor_idx in neighbor_indices:
-                    if neighbor_idx <= edge_idx or neighbor_idx >= len(body_ids):
-                        continue
-                    body_b = body_ids[neighbor_idx]
+            for i, body_a in enumerate(body_ids):
+                for body_b in body_ids[i + 1 :]:
                     for shape_a in builder.body_shapes.get(body_a, []):
                         for shape_b in builder.body_shapes.get(body_b, []):
                             builder.add_shape_collision_filter_pair(int(shape_a), int(shape_b))
+            edges = [(i, i + 1) for i in range(len(positions) - 1)]
             half_lengths = [float(wp.length(positions[v] - positions[u])) / 2.0 for u, v in edges]
             node_to_bodies = defaultdict(list)
             for edge_idx, (u, v) in enumerate(edges):
                 if edge_idx < len(body_ids):
                     node_to_bodies[u].append(body_ids[edge_idx])
                     node_to_bodies[v].append(body_ids[edge_idx])
-            segment_to_body = {i: body_id for i, body_id in enumerate(body_ids)}
             rod_info[rec["key"]] = {
                 "curve_path": rec["curve_path"],
                 "body_indices": body_ids,
                 "joint_indices": joint_ids,
-                "wrap": rec["wrap"],
                 "positions": positions,
                 "half_lengths": half_lengths,
                 "edges_list": edges,
-                "radii": edge_radii or [rec["radius"]] * len(body_ids),
+                "radii": [rec["radius"]] * len(body_ids),
                 "prim": rec["prim"],
                 "curve_index": rec["curve_index"],
                 "node_to_bodies": dict(node_to_bodies),
-                "segment_to_body": segment_to_body,
             }
             continue
 
@@ -531,16 +363,8 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
 
         first = curves_by_path[keys[0]]
         material = first["material"]
-        radius = first["radius"]
-        seg_len = sum(
-            float(wp.length(node_positions[v] - node_positions[u]))
-            for u, v in graph_edges
-        ) / max(len(graph_edges), 1)
-        from newton._src.utils.cable import create_cable_stiffness_from_elastic_moduli
-        raw_stretch = material.get("physics:stretchStiffness", 1.0e5)
-        raw_bend = material.get("physics:bendStiffness", 0.0)
-        stretch_stiffness = create_cable_stiffness_from_elastic_moduli(raw_stretch, radius, seg_len)[0] if raw_stretch else None
-        bend_stiffness = create_cable_stiffness_from_elastic_moduli(raw_bend, radius, seg_len)[1] if raw_bend else None
+        stretch_stiffness = material.get("physics:stretchStiffness", 1.0e5)
+        bend_stiffness = material.get("physics:bendStiffness", 0.0)
         stretch_damping = material.get("newton:stretchDamping", 0.0)
         bend_damping = material.get("newton:bendDamping", 0.0)
         wrap = any(curves_by_path[key]["wrap"] for key in keys)
@@ -562,63 +386,34 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
             label=label,
         )
 
-        graph_segment_materials: list[dict[str, float]] = []
-        graph_segment_radii: list[float] = []
-        for key, u, v in graph_edge_records:
-            rec = curves_by_path[key]
-            segment_idx = u if v == u + 1 else len(rec["segment_materials"]) - 1
-            segment_idx = min(max(segment_idx, 0), max(len(rec["segment_materials"]) - 1, 0))
-            graph_segment_materials.append(
-                rec["segment_materials"][segment_idx] if rec["segment_materials"] else rec["material"]
-            )
-            graph_segment_radii.append(rec["segment_radii"][segment_idx] if rec["segment_radii"] else rec["radius"])
-        graph_edge_radii = _apply_segment_material_overrides(
-            builder,
-            body_ids,
-            joint_ids,
-            graph_segment_materials,
-            graph_segment_radii,
-            component_key,
-        )
-
-        per_curve_edges: dict[str, list[tuple[int, int, int, int]]] = defaultdict(list)
+        per_curve_edges: dict[str, list[tuple[int, int, int]]] = defaultdict(list)
         node_to_bodies_by_curve: dict[str, dict[int, list[int]]] = defaultdict(lambda: defaultdict(list))
-        segment_to_body_by_curve: dict[str, dict[int, int]] = defaultdict(dict)
         for edge_idx, (key, u, v) in enumerate(graph_edge_records):
             if edge_idx >= len(body_ids):
                 continue
             body_id = body_ids[edge_idx]
-            per_curve_edges[key].append((u, v, body_id, edge_idx))
+            per_curve_edges[key].append((u, v, body_id))
             node_to_bodies_by_curve[key][u].append(body_id)
             node_to_bodies_by_curve[key][v].append(body_id)
-            segment_idx = u if v == u + 1 else len(curves_by_path[key]["positions"]) - 1
-            segment_to_body_by_curve[key][segment_idx] = body_id
 
         for key in keys:
             rec = curves_by_path[key]
             curve_edges = per_curve_edges.get(key, [])
-            curve_body_ids = [body_id for _, _, body_id, _ in curve_edges]
-            edges = [(u, v) for u, v, _, _ in curve_edges]
-            edge_indices = [edge_idx for _, _, _, edge_idx in curve_edges]
+            curve_body_ids = [body_id for _, _, body_id in curve_edges]
+            edges = [(u, v) for u, v, _ in curve_edges]
             positions = rec["positions"]
             half_lengths = [float(wp.length(positions[v] - positions[u])) / 2.0 for u, v in edges]
             rod_info[key] = {
                 "curve_path": rec["curve_path"],
                 "body_indices": curve_body_ids,
                 "joint_indices": joint_ids,
-                "wrap": wrap,
                 "positions": positions,
                 "half_lengths": half_lengths,
                 "edges_list": edges,
-                "radii": (
-                    [graph_edge_radii[i] for i in edge_indices]
-                    if graph_edge_radii
-                    else [rec["radius"]] * len(curve_body_ids)
-                ),
+                "radii": [rec["radius"]] * len(curve_body_ids),
                 "prim": rec["prim"],
                 "curve_index": rec["curve_index"],
                 "node_to_bodies": {idx: bodies for idx, bodies in node_to_bodies_by_curve[key].items()},
-                "segment_to_body": dict(segment_to_body_by_curve[key]),
             }
 
     return rod_info
@@ -632,124 +427,6 @@ def _rod_for_curve_path(rod_info: dict, curve_path: str):
         if info.get("curve_path") == curve_path:
             return info
     return None
-
-
-def _filter_enabled(prim: Usd.Prim) -> bool:
-    attr = prim.GetAttribute("physics:filterEnabled")
-    if not attr or not attr.HasAuthoredValue():
-        return True
-    return bool(attr.Get())
-
-
-def _filter_element_indices(prim: Usd.Prim, suffix: str) -> list[int] | None:
-    counts_attr = prim.GetAttribute(f"physics:groupElemCounts{suffix}")
-    indices_attr = prim.GetAttribute(f"physics:groupElemIndices{suffix}")
-    counts = counts_attr.Get() if counts_attr and counts_attr.HasAuthoredValue() else []
-    indices = indices_attr.Get() if indices_attr and indices_attr.HasAuthoredValue() else []
-    if not counts and not indices:
-        return None
-    if counts and sum(int(c) for c in counts) != len(indices):
-        print(
-            f"[warn] {prim.GetPath()}: groupElemCounts{suffix} does not match "
-            f"groupElemIndices{suffix}, using authored indices directly"
-        )
-    return [int(i) for i in indices]
-
-
-def _rigid_shape_ids_for_path(
-    stage: Usd.Stage,
-    builder: newton.ModelBuilder,
-    path: str,
-    body_index_map: dict,
-    path_shape_map: dict,
-) -> list[int]:
-    shape_ids: list[int] = []
-    if path in path_shape_map:
-        shape_ids.append(int(path_shape_map[path]))
-    body_id = body_index_map.get(path)
-    if body_id is not None:
-        shape_ids.extend(int(s) for s in builder.body_shapes.get(body_id, []))
-
-    prim = stage.GetPrimAtPath(path)
-    if prim and prim.IsValid():
-        prefix = path + "/"
-        for shape_path, shape_id in path_shape_map.items():
-            if shape_path.startswith(prefix):
-                shape_ids.append(int(shape_id))
-
-    return list(dict.fromkeys(shape_ids))
-
-
-def _filter_shape_ids_for_path(
-    stage: Usd.Stage,
-    builder: newton.ModelBuilder,
-    rod_info: dict,
-    body_index_map: dict,
-    path_shape_map: dict,
-    path: str,
-    element_indices: list[int] | None,
-) -> list[int]:
-    info = _rod_for_curve_path(rod_info, path)
-    if info is not None:
-        if element_indices is None:
-            element_indices = list(range(len(info["body_indices"])))
-        shape_ids: list[int] = []
-        segment_to_body = info.get("segment_to_body", {})
-        for segment_idx in element_indices:
-            body_id = segment_to_body.get(segment_idx)
-            if body_id is None and 0 <= segment_idx < len(info["body_indices"]):
-                body_id = info["body_indices"][segment_idx]
-            if body_id is None:
-                print(f"[warn] filter source {path}: segment {segment_idx} was not imported")
-                continue
-            shape_ids.extend(int(s) for s in builder.body_shapes.get(body_id, []))
-        return list(dict.fromkeys(shape_ids))
-
-    if element_indices is not None:
-        print(f"[warn] filter source {path}: element indices are only implemented for curves")
-    return _rigid_shape_ids_for_path(stage, builder, path, body_index_map, path_shape_map)
-
-
-def parse_element_collision_filters(
-    stage: Usd.Stage,
-    builder: newton.ModelBuilder,
-    rod_info: dict,
-    body_index_map: dict,
-    path_shape_map: dict,
-) -> None:
-    """Parse AOUSD PhysicsElementCollisionFilter into Newton shape filters."""
-    for prim in stage.Traverse():
-        if prim.GetTypeName() != "PhysicsElementCollisionFilter":
-            continue
-        if not _filter_enabled(prim):
-            continue
-        src0_targets = prim.GetRelationship("physics:src0").GetTargets()
-        src1_targets = prim.GetRelationship("physics:src1").GetTargets()
-        if not src0_targets or not src1_targets:
-            print(f"[warn] {prim.GetPath()}: missing collision filter sources, skipping")
-            continue
-        src0 = str(src0_targets[0])
-        src1 = str(src1_targets[0])
-        elems0 = _filter_element_indices(prim, "0")
-        elems1 = _filter_element_indices(prim, "1")
-        shapes0 = _filter_shape_ids_for_path(stage, builder, rod_info, body_index_map, path_shape_map, src0, elems0)
-        shapes1 = _filter_shape_ids_for_path(stage, builder, rod_info, body_index_map, path_shape_map, src1, elems1)
-        if not shapes0 or not shapes1:
-            print(f"[warn] {prim.GetPath()}: resolved empty collision filter shape set, skipping")
-            continue
-        pair_count = 0
-        for shape0 in shapes0:
-            for shape1 in shapes1:
-                if shape0 == shape1:
-                    continue
-                builder.add_shape_collision_filter_pair(int(shape0), int(shape1))
-                pair_count += 1
-        elem_desc0 = "all" if elems0 is None else elems0
-        elem_desc1 = "all" if elems1 is None else elems1
-        print(
-            f"[filter] {prim.GetName()}: {src0} segments={elem_desc0} "
-            f"<-> {src1} elements={elem_desc1} pairs={pair_count}"
-        )
 
 def _pin_point(info: dict, node_idx: int, builder: newton.ModelBuilder) -> None:
     body_ids = info["body_indices"]
@@ -868,24 +545,8 @@ def parse_attachments(stage: Usd.Stage, builder: newton.ModelBuilder, rod_info: 
         for i, node_idx_raw in enumerate(indices0):
             node_idx = int(node_idx_raw)
             if src1 == "/World":
-                # Use a ball joint to world instead of zeroing mass, so the
-                # articulation root body keeps its mass and can be simulated normally.
-                pinned_bodies = set(info.get("node_to_bodies", {}).get(node_idx, []))
-                if not pinned_bodies:
-                    body_ids = info["body_indices"]
-                    pinned_bodies = {body_ids[min(max(node_idx, 0), len(body_ids) - 1)]}
-                c1 = coords1[i] if i < len(coords1) else None
-                world_pos = wp.vec3(float(c1[0]), float(c1[1]), float(c1[2])) if c1 is not None else wp.vec3(0.0, 0.0, 0.0)
-                for child_body in pinned_bodies:
-                    child_local = _node_local_pos(info, builder, child_body, node_idx)
-                    builder.add_joint_ball(
-                        parent=-1,
-                        child=child_body,
-                        parent_xform=wp.transform(world_pos, wp.quat_identity()),
-                        child_xform=wp.transform(child_local, wp.quat_identity()),
-                        label=str(prim.GetPath()).replace("/", "_"),
-                    )
-                print(f"[attach] {prim.GetName()}: ball-joint {src0}[{node_idx}] to world at {world_pos}")
+                _pin_point(info, node_idx, builder)
+                print(f"[attach] {prim.GetName()}: pin {src0}[{node_idx}] to world")
                 continue
 
             body_ids = info["body_indices"]
@@ -953,29 +614,17 @@ class RodSimulation:
         try:
             usd_result = builder.add_usd(stage, verbose=False)
             body_index_map: dict[str, int] = usd_result["path_body_map"]
-            path_shape_map: dict[str, int] = usd_result["path_shape_map"]
-            print(f"[add_usd] bodies={len(body_index_map)}  joints={len(usd_result['path_joint_map'])}  shapes={len(path_shape_map)}")
+            print(f"[add_usd] bodies={len(body_index_map)}  joints={len(usd_result['path_joint_map'])}  shapes={len(usd_result['path_shape_map'])}")
         except Exception as e:
             print(f"[add_usd] failed ({e}), falling back to manual body creation")
             usd_result = None
             body_index_map = {}
-            path_shape_map = {}
 
         # Second pass: parse AOUSD curve deformables.
         rod_info = parse_rods(stage, builder)
         self.rod_info = rod_info
         if not rod_info:
             raise RuntimeError("No PhysicsCurvesDeformableSimAPI BasisCurves found in the USD file.")
-
-        # Wrap any single-cable joints not already wrapped (wrap_in_articulation=False
-        # when no ArticulationRoot is found in the hierarchy, e.g. adi assets).
-        for info in rod_info.values():
-            if info.get("wrap"):
-                continue  # already wrapped by add_rod / add_rod_graph
-            joint_ids = info.get("joint_indices", [])
-            if joint_ids:
-                label = info.get("curve_path", "cable").replace("/", "_") + "_articulation"
-                builder.add_articulation(joint_ids, label=label)
 
         # For any attachment target not already in body_index_map, fall back to a
         # static proxy body so simple authored fixtures still load.
@@ -1009,9 +658,8 @@ class RodSimulation:
             body_index_map[target_path] = body_id
             print(f"[body] static proxy for {target_path}: id={body_id}")
 
-        # Parse attachments and local collision filters.
+        # Parse attachments
         parse_attachments(stage, builder, rod_info, body_index_map)
-        parse_element_collision_filters(stage, builder, rod_info, body_index_map, path_shape_map)
 
         print("\nFinalizing model...")
         builder.color()
@@ -1039,8 +687,6 @@ class RodSimulation:
             rigid_contact_max=rigid_contact_max,
         )
         self.contacts = self.model.contacts(collision_pipeline=pipeline)
-        self.last_rigid_contact_count = 0
-        self.last_soft_contact_count = 0
 
         self.viewer.set_model(self.model)
         self._set_camera(rod_info)
@@ -1073,40 +719,22 @@ class RodSimulation:
         print(f"  camera: pos=({cam_pos[0]:.3f},{cam_pos[1]:.3f},{cam_pos[2]:.3f})  pitch={pitch:.1f}°  yaw={yaw}°")
 
     def _capture(self):
-        # Contact-count diagnostics read Warp counters back to host each frame,
-        # so keep this example runner out of CUDA graph capture.
-        self.graph = None
-
-    def _contact_count(self, name: str) -> int:
-        value = getattr(self.contacts, name, None)
-        if value is None:
-            return 0
-        try:
-            return int(value.numpy()[0])
-        except Exception:
-            return 0
+        if wp.get_device().is_cuda:
+            with wp.ScopedCapture() as cap:
+                self._simulate()
+            self.graph = cap.graph
+        else:
+            self.graph = None
 
     def _simulate(self):
-        max_rigid_contacts = 0
-        max_soft_contacts = 0
         for _ in range(self.sim_substeps):
             self.state_0.clear_forces()
             self.viewer.apply_forces(self.state_0)
             self.model.collide(self.state_0, self.contacts)
-            max_rigid_contacts = max(max_rigid_contacts, self._contact_count("rigid_contact_count"))
-            max_soft_contacts = max(max_soft_contacts, self._contact_count("soft_contact_count"))
             self.solver.step(
                 self.state_0, self.state_1, self.control, self.contacts, self.sim_dt
             )
             self.state_0, self.state_1 = self.state_1, self.state_0
-        self.last_rigid_contact_count = max_rigid_contacts
-        self.last_soft_contact_count = max_soft_contacts
-
-    def _print_contact_counts(self, frame: int) -> None:
-        print(
-            f"  frame {frame}  t={self.sim_time:.2f}s  "
-            f"contacts rigid={self.last_rigid_contact_count} soft={self.last_soft_contact_count}"
-        )
 
     def step(self):
         if self.graph:
@@ -1137,7 +765,8 @@ class RodSimulation:
                 if not self.viewer.is_paused():
                     self.step()
                     frame += 1
-                    self._print_contact_counts(frame)
+                    if frame % 60 == 0:
+                        print(f"  frame {frame}  t={self.sim_time:.2f}s")
                 self.render()
         else:
             # Headless / file viewer: run fixed number of frames
@@ -1145,7 +774,8 @@ class RodSimulation:
             for i in range(self.num_steps):
                 self.step()
                 self.render()
-                self._print_contact_counts(i + 1)
+                if (i + 1) % 60 == 0:
+                    print(f"  frame {i+1}/{self.num_steps}  t={self.sim_time:.2f}s")
         print("Done.")
 
 

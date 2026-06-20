@@ -6,11 +6,11 @@
     This file demonstrates the reviewer-suggested subgeometry approach for a rod
     whose segment radius and material parameters vary by region. A single
     BasisCurves prim owns the simulation topology. Segment-level variation is
-    expressed through GeomSubset prims with elementType = "segment". This is the
-    intended subgeometry-style representation for discrete segment material
-    regions. Current usdImaging/Hydra may warn for segment GeomSubsets, but the
-    authored USD uses the standard subset form instead of a Newton-only region
-    convention.
+    expressed through imaging-safe segment-region prims. OpenUSD core supports
+    GeomSubset elementType = "segment" for curves, but current usdImaging/Hydra
+    warns for segment GeomSubsets, so this example uses Scope prims carrying
+    `uniform token physics:elementType = "segment"`, `int[] physics:indices`,
+    and a material binding.
 
     Segment index convention:
       segment i connects points[i] -> points[i + 1].
@@ -23,7 +23,7 @@
 
     The float[] widths array is authored to match the visible taper. The physical
     curve thickness is owned by the bound materials; an importer should resolve
-    each segment's material from the GeomSubset material binding and derive
+    each segment's material from the segment-region material binding and derive
     per-segment radius/stiffness from that material."""
     metersPerUnit = 1
     upAxis = "Z"
@@ -69,44 +69,35 @@ def Xform "World"
                     0.010, 0.010, 0.010, 0.007, 0.007, 0.007, 0.007
                 ]
 
-                def GeomSubset "segments_soft_thin" (
-                    prepend apiSchemas = ["MaterialBindingAPI"]
-                )
+                def Scope "segment_material_regions"
                 {
-                    uniform token elementType = "segment"
-                    uniform token familyName = "materialBind"
-                    int[] indices = [0, 1, 2]
-                    rel material:binding = </World/Looks/SoftThinMaterial>
-                }
+                    def Scope "segments_soft_thin"
+                    {
+                        uniform token physics:elementType = "segment"
+                        int[] physics:indices = [0, 1, 2]
+                        rel material:binding = </World/Looks/SoftThinMaterial>
+                    }
 
-                def GeomSubset "segments_default" (
-                    prepend apiSchemas = ["MaterialBindingAPI"]
-                )
-                {
-                    uniform token elementType = "segment"
-                    uniform token familyName = "materialBind"
-                    int[] indices = [3, 4, 5]
-                    rel material:binding = </World/Looks/DefaultRubberMaterial>
-                }
+                    def Scope "segments_default"
+                    {
+                        uniform token physics:elementType = "segment"
+                        int[] physics:indices = [3, 4, 5]
+                        rel material:binding = </World/Looks/DefaultRubberMaterial>
+                    }
 
-                def GeomSubset "segments_stiff_thick" (
-                    prepend apiSchemas = ["MaterialBindingAPI"]
-                )
-                {
-                    uniform token elementType = "segment"
-                    uniform token familyName = "materialBind"
-                    int[] indices = [6, 7, 8]
-                    rel material:binding = </World/Looks/StiffThickMaterial>
-                }
+                    def Scope "segments_stiff_thick"
+                    {
+                        uniform token physics:elementType = "segment"
+                        int[] physics:indices = [6, 7, 8]
+                        rel material:binding = </World/Looks/StiffThickMaterial>
+                    }
 
-                def GeomSubset "segments_damped_tip" (
-                    prepend apiSchemas = ["MaterialBindingAPI"]
-                )
-                {
-                    uniform token elementType = "segment"
-                    uniform token familyName = "materialBind"
-                    int[] indices = [9, 10, 11]
-                    rel material:binding = </World/Looks/DampedTipMaterial>
+                    def Scope "segments_damped_tip"
+                    {
+                        uniform token physics:elementType = "segment"
+                        int[] physics:indices = [9, 10, 11]
+                        rel material:binding = </World/Looks/DampedTipMaterial>
+                    }
                 }
             }
 
@@ -177,11 +168,11 @@ def Xform "World"
             prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]
         )
         {
-            float physics:thickness = 0.02
-            float physics:stretchStiffness = 1
-            float physics:bendStiffness = 1
-            float newton:stretchDamping = 0.1
-            float newton:bendDamping = 10.0
+            float physics:thickness = 0.007
+            float physics:stretchStiffness = 180000
+            float physics:bendStiffness = 900
+            float newton:stretchDamping = 0.002
+            float newton:bendDamping = 0.05
             float physics:dynamicFriction = 0.7
             float physics:staticFriction = 0.9
             float newton:contactStiffness = 120
