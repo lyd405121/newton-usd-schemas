@@ -417,18 +417,28 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 rec["segment_radii"],
                 rec["key"],
             )
-            for i, body_a in enumerate(body_ids):
-                for body_b in body_ids[i + 1 :]:
+            edges = [(i, i + 1) for i in range(len(positions) - 1)]
+            for edge_idx, body_a in enumerate(body_ids):
+                neighbor_indices = [edge_idx - 1, edge_idx + 1]
+                if rec["closed"]:
+                    if edge_idx == 0:
+                        neighbor_indices.append(len(body_ids) - 1)
+                    elif edge_idx == len(body_ids) - 1:
+                        neighbor_indices.append(0)
+                for neighbor_idx in neighbor_indices:
+                    if neighbor_idx <= edge_idx or neighbor_idx >= len(body_ids):
+                        continue
+                    body_b = body_ids[neighbor_idx]
                     for shape_a in builder.body_shapes.get(body_a, []):
                         for shape_b in builder.body_shapes.get(body_b, []):
                             builder.add_shape_collision_filter_pair(int(shape_a), int(shape_b))
-            edges = [(i, i + 1) for i in range(len(positions) - 1)]
             half_lengths = [float(wp.length(positions[v] - positions[u])) / 2.0 for u, v in edges]
             node_to_bodies = defaultdict(list)
             for edge_idx, (u, v) in enumerate(edges):
                 if edge_idx < len(body_ids):
                     node_to_bodies[u].append(body_ids[edge_idx])
                     node_to_bodies[v].append(body_ids[edge_idx])
+            segment_to_body = {i: body_id for i, body_id in enumerate(body_ids)}
             rod_info[rec["key"]] = {
                 "curve_path": rec["curve_path"],
                 "body_indices": body_ids,
@@ -440,6 +450,7 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 "prim": rec["prim"],
                 "curve_index": rec["curve_index"],
                 "node_to_bodies": dict(node_to_bodies),
+                "segment_to_body": segment_to_body,
             }
             continue
 
@@ -543,6 +554,7 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
 
         per_curve_edges: dict[str, list[tuple[int, int, int, int]]] = defaultdict(list)
         node_to_bodies_by_curve: dict[str, dict[int, list[int]]] = defaultdict(lambda: defaultdict(list))
+        segment_to_body_by_curve: dict[str, dict[int, int]] = defaultdict(dict)
         for edge_idx, (key, u, v) in enumerate(graph_edge_records):
             if edge_idx >= len(body_ids):
                 continue
@@ -550,6 +562,8 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
             per_curve_edges[key].append((u, v, body_id, edge_idx))
             node_to_bodies_by_curve[key][u].append(body_id)
             node_to_bodies_by_curve[key][v].append(body_id)
+            segment_idx = u if v == u + 1 else len(curves_by_path[key]["positions"]) - 1
+            segment_to_body_by_curve[key][segment_idx] = body_id
 
         for key in keys:
             rec = curves_by_path[key]
@@ -574,6 +588,7 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 "prim": rec["prim"],
                 "curve_index": rec["curve_index"],
                 "node_to_bodies": {idx: bodies for idx, bodies in node_to_bodies_by_curve[key].items()},
+                "segment_to_body": dict(segment_to_body_by_curve[key]),
             }
 
     return rod_info
@@ -587,6 +602,124 @@ def _rod_for_curve_path(rod_info: dict, curve_path: str):
         if info.get("curve_path") == curve_path:
             return info
     return None
+
+
+def _filter_enabled(prim: Usd.Prim) -> bool:
+    attr = prim.GetAttribute("physics:filterEnabled")
+    if not attr or not attr.HasAuthoredValue():
+        return True
+    return bool(attr.Get())
+
+
+def _filter_element_indices(prim: Usd.Prim, suffix: str) -> list[int] | None:
+    counts_attr = prim.GetAttribute(f"physics:groupElemCounts{suffix}")
+    indices_attr = prim.GetAttribute(f"physics:groupElemIndices{suffix}")
+    counts = counts_attr.Get() if counts_attr and counts_attr.HasAuthoredValue() else []
+    indices = indices_attr.Get() if indices_attr and indices_attr.HasAuthoredValue() else []
+    if not counts and not indices:
+        return None
+    if counts and sum(int(c) for c in counts) != len(indices):
+        print(
+            f"[warn] {prim.GetPath()}: groupElemCounts{suffix} does not match "
+            f"groupElemIndices{suffix}, using authored indices directly"
+        )
+    return [int(i) for i in indices]
+
+
+def _rigid_shape_ids_for_path(
+    stage: Usd.Stage,
+    builder: newton.ModelBuilder,
+    path: str,
+    body_index_map: dict,
+    path_shape_map: dict,
+) -> list[int]:
+    shape_ids: list[int] = []
+    if path in path_shape_map:
+        shape_ids.append(int(path_shape_map[path]))
+    body_id = body_index_map.get(path)
+    if body_id is not None:
+        shape_ids.extend(int(s) for s in builder.body_shapes.get(body_id, []))
+
+    prim = stage.GetPrimAtPath(path)
+    if prim and prim.IsValid():
+        prefix = path + "/"
+        for shape_path, shape_id in path_shape_map.items():
+            if shape_path.startswith(prefix):
+                shape_ids.append(int(shape_id))
+
+    return list(dict.fromkeys(shape_ids))
+
+
+def _filter_shape_ids_for_path(
+    stage: Usd.Stage,
+    builder: newton.ModelBuilder,
+    rod_info: dict,
+    body_index_map: dict,
+    path_shape_map: dict,
+    path: str,
+    element_indices: list[int] | None,
+) -> list[int]:
+    info = _rod_for_curve_path(rod_info, path)
+    if info is not None:
+        if element_indices is None:
+            element_indices = list(range(len(info["body_indices"])))
+        shape_ids: list[int] = []
+        segment_to_body = info.get("segment_to_body", {})
+        for segment_idx in element_indices:
+            body_id = segment_to_body.get(segment_idx)
+            if body_id is None and 0 <= segment_idx < len(info["body_indices"]):
+                body_id = info["body_indices"][segment_idx]
+            if body_id is None:
+                print(f"[warn] filter source {path}: segment {segment_idx} was not imported")
+                continue
+            shape_ids.extend(int(s) for s in builder.body_shapes.get(body_id, []))
+        return list(dict.fromkeys(shape_ids))
+
+    if element_indices is not None:
+        print(f"[warn] filter source {path}: element indices are only implemented for curves")
+    return _rigid_shape_ids_for_path(stage, builder, path, body_index_map, path_shape_map)
+
+
+def parse_element_collision_filters(
+    stage: Usd.Stage,
+    builder: newton.ModelBuilder,
+    rod_info: dict,
+    body_index_map: dict,
+    path_shape_map: dict,
+) -> None:
+    """Parse AOUSD PhysicsElementCollisionFilter into Newton shape filters."""
+    for prim in stage.Traverse():
+        if prim.GetTypeName() != "PhysicsElementCollisionFilter":
+            continue
+        if not _filter_enabled(prim):
+            continue
+        src0_targets = prim.GetRelationship("physics:src0").GetTargets()
+        src1_targets = prim.GetRelationship("physics:src1").GetTargets()
+        if not src0_targets or not src1_targets:
+            print(f"[warn] {prim.GetPath()}: missing collision filter sources, skipping")
+            continue
+        src0 = str(src0_targets[0])
+        src1 = str(src1_targets[0])
+        elems0 = _filter_element_indices(prim, "0")
+        elems1 = _filter_element_indices(prim, "1")
+        shapes0 = _filter_shape_ids_for_path(stage, builder, rod_info, body_index_map, path_shape_map, src0, elems0)
+        shapes1 = _filter_shape_ids_for_path(stage, builder, rod_info, body_index_map, path_shape_map, src1, elems1)
+        if not shapes0 or not shapes1:
+            print(f"[warn] {prim.GetPath()}: resolved empty collision filter shape set, skipping")
+            continue
+        pair_count = 0
+        for shape0 in shapes0:
+            for shape1 in shapes1:
+                if shape0 == shape1:
+                    continue
+                builder.add_shape_collision_filter_pair(int(shape0), int(shape1))
+                pair_count += 1
+        elem_desc0 = "all" if elems0 is None else elems0
+        elem_desc1 = "all" if elems1 is None else elems1
+        print(
+            f"[filter] {prim.GetName()}: {src0} segments={elem_desc0} "
+            f"<-> {src1} elements={elem_desc1} pairs={pair_count}"
+        )
 
 def _pin_point(info: dict, node_idx: int, builder: newton.ModelBuilder) -> None:
     body_ids = info["body_indices"]
@@ -774,11 +907,13 @@ class RodSimulation:
         try:
             usd_result = builder.add_usd(stage, verbose=False)
             body_index_map: dict[str, int] = usd_result["path_body_map"]
-            print(f"[add_usd] bodies={len(body_index_map)}  joints={len(usd_result['path_joint_map'])}  shapes={len(usd_result['path_shape_map'])}")
+            path_shape_map: dict[str, int] = usd_result["path_shape_map"]
+            print(f"[add_usd] bodies={len(body_index_map)}  joints={len(usd_result['path_joint_map'])}  shapes={len(path_shape_map)}")
         except Exception as e:
             print(f"[add_usd] failed ({e}), falling back to manual body creation")
             usd_result = None
             body_index_map = {}
+            path_shape_map = {}
 
         # Second pass: parse AOUSD curve deformables.
         rod_info = parse_rods(stage, builder)
@@ -818,8 +953,9 @@ class RodSimulation:
             body_index_map[target_path] = body_id
             print(f"[body] static proxy for {target_path}: id={body_id}")
 
-        # Parse attachments
+        # Parse attachments and local collision filters.
         parse_attachments(stage, builder, rod_info, body_index_map)
+        parse_element_collision_filters(stage, builder, rod_info, body_index_map, path_shape_map)
 
         print("\nFinalizing model...")
         builder.color()
@@ -847,6 +983,8 @@ class RodSimulation:
             rigid_contact_max=rigid_contact_max,
         )
         self.contacts = self.model.contacts(collision_pipeline=pipeline)
+        self.last_rigid_contact_count = 0
+        self.last_soft_contact_count = 0
 
         self.viewer.set_model(self.model)
         self._set_camera(rod_info)
@@ -879,22 +1017,40 @@ class RodSimulation:
         print(f"  camera: pos=({cam_pos[0]:.3f},{cam_pos[1]:.3f},{cam_pos[2]:.3f})  pitch={pitch:.1f}°  yaw={yaw}°")
 
     def _capture(self):
-        if wp.get_device().is_cuda:
-            with wp.ScopedCapture() as cap:
-                self._simulate()
-            self.graph = cap.graph
-        else:
-            self.graph = None
+        # Contact-count diagnostics read Warp counters back to host each frame,
+        # so keep this example runner out of CUDA graph capture.
+        self.graph = None
+
+    def _contact_count(self, name: str) -> int:
+        value = getattr(self.contacts, name, None)
+        if value is None:
+            return 0
+        try:
+            return int(value.numpy()[0])
+        except Exception:
+            return 0
 
     def _simulate(self):
+        max_rigid_contacts = 0
+        max_soft_contacts = 0
         for _ in range(self.sim_substeps):
             self.state_0.clear_forces()
             self.viewer.apply_forces(self.state_0)
             self.model.collide(self.state_0, self.contacts)
+            max_rigid_contacts = max(max_rigid_contacts, self._contact_count("rigid_contact_count"))
+            max_soft_contacts = max(max_soft_contacts, self._contact_count("soft_contact_count"))
             self.solver.step(
                 self.state_0, self.state_1, self.control, self.contacts, self.sim_dt
             )
             self.state_0, self.state_1 = self.state_1, self.state_0
+        self.last_rigid_contact_count = max_rigid_contacts
+        self.last_soft_contact_count = max_soft_contacts
+
+    def _print_contact_counts(self, frame: int) -> None:
+        print(
+            f"  frame {frame}  t={self.sim_time:.2f}s  "
+            f"contacts rigid={self.last_rigid_contact_count} soft={self.last_soft_contact_count}"
+        )
 
     def step(self):
         if self.graph:
@@ -925,8 +1081,7 @@ class RodSimulation:
                 if not self.viewer.is_paused():
                     self.step()
                     frame += 1
-                    if frame % 60 == 0:
-                        print(f"  frame {frame}  t={self.sim_time:.2f}s")
+                    self._print_contact_counts(frame)
                 self.render()
         else:
             # Headless / file viewer: run fixed number of frames
@@ -934,8 +1089,7 @@ class RodSimulation:
             for i in range(self.num_steps):
                 self.step()
                 self.render()
-                if (i + 1) % 60 == 0:
-                    print(f"  frame {i+1}/{self.num_steps}  t={self.sim_time:.2f}s")
+                self._print_contact_counts(i + 1)
         print("Done.")
 
 
