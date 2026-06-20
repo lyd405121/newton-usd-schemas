@@ -104,8 +104,7 @@ def _find_bound_material_prim(prim: Usd.Prim) -> Usd.Prim | None:
     return None
 
 
-def _curve_material(prim: Usd.Prim) -> dict[str, float]:
-    mat = _find_bound_material_prim(prim)
+def _material_values(mat: Usd.Prim | None) -> dict[str, float]:
     out: dict[str, float] = {}
     if mat is None:
         return out
@@ -120,6 +119,38 @@ def _curve_material(prim: Usd.Prim) -> dict[str, float]:
         if val is not None:
             out[name] = val
     return out
+
+
+def _curve_material(prim: Usd.Prim) -> dict[str, float]:
+    return _material_values(_find_bound_material_prim(prim))
+
+
+def _curve_segment_materials(
+    prim: Usd.Prim,
+    segment_count: int,
+    base_material: dict[str, float],
+) -> list[dict[str, float]]:
+    """Resolve per-segment material values from child GeomSubset bindings."""
+    materials = [dict(base_material) for _ in range(segment_count)]
+    if segment_count <= 0:
+        return materials
+
+    for child in prim.GetChildren():
+        if child.GetTypeName() != "GeomSubset":
+            continue
+        if child.GetAttribute("elementType").Get() != "segment":
+            continue
+        indices = child.GetAttribute("indices").Get() or []
+        subset_material = _curve_material(child)
+        if not subset_material:
+            continue
+        for idx in indices:
+            segment_idx = int(idx)
+            if 0 <= segment_idx < segment_count:
+                materials[segment_idx] = dict(subset_material)
+            else:
+                print(f"[warn] {child.GetPath()}: segment index {segment_idx} outside 0..{segment_count - 1}")
+    return materials
 
 
 def _ancestor_has_api(prim: Usd.Prim, api_name: str) -> bool:
@@ -142,13 +173,97 @@ def _curve_vertex_counts(curves: UsdGeom.BasisCurves, n_points: int) -> list[int
 
 
 def _curve_radius(curves: UsdGeom.BasisCurves, material: dict[str, float]) -> float:
+    return _segment_radius(curves, 0, material, 0.005)
+
+
+def _segment_radius(
+    curves: UsdGeom.BasisCurves,
+    segment_index: int,
+    material: dict[str, float],
+    fallback: float,
+) -> float:
     thickness = material.get("physics:thickness")
     if thickness is not None and thickness > 0.0:
         return 0.5 * thickness
     widths = curves.GetWidthsAttr().Get()
     if widths and len(widths) > 0:
-        return max(float(widths[0]) * 0.5, 1.0e-6)
-    return 0.005
+        width_idx = min(max(segment_index, 0), len(widths) - 1)
+        return max(float(widths[width_idx]) * 0.5, 1.0e-6)
+    return fallback
+
+
+def _average_material(left: dict[str, float], right: dict[str, float]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for key in set(left) | set(right):
+        a = left.get(key)
+        b = right.get(key)
+        if a is not None and b is not None:
+            out[key] = 0.5 * (a + b)
+        elif a is not None:
+            out[key] = a
+        elif b is not None:
+            out[key] = b
+    return out
+
+
+def _format_range(values: list[float]) -> str:
+    if not values:
+        return "none"
+    return f"{min(values):.4g}..{max(values):.4g}"
+
+
+def _apply_segment_material_overrides(
+    builder: newton.ModelBuilder,
+    body_ids: list[int],
+    joint_ids: list[int],
+    segment_materials: list[dict[str, float]],
+    segment_radii: list[float],
+    label: str,
+) -> list[float]:
+    """Apply GeomSubset segment material values after add_rod/add_rod_graph."""
+    if not body_ids or not segment_radii:
+        return []
+
+    edge_radii = [segment_radii[min(i, len(segment_radii) - 1)] for i in range(len(body_ids))]
+
+    for edge_idx, body_id in enumerate(body_ids):
+        radius = edge_radii[edge_idx]
+        for shape_idx in builder.body_shapes.get(body_id, []):
+            scale = builder.shape_scale[shape_idx]
+            half_height = float(scale[1])
+            builder.shape_scale[shape_idx] = (radius, half_height, radius)
+            builder.shape_collision_radius[shape_idx] = radius + abs(half_height)
+
+    for joint_order, joint_idx in enumerate(joint_ids):
+        if joint_idx < 0 or joint_idx >= len(builder.joint_qd_start):
+            continue
+        left = segment_materials[min(joint_order, len(segment_materials) - 1)] if segment_materials else {}
+        right = segment_materials[min(joint_order + 1, len(segment_materials) - 1)] if segment_materials else left
+        material = _average_material(left, right)
+        dof_start = builder.joint_qd_start[joint_idx]
+        if dof_start < len(builder.joint_target_ke):
+            builder.joint_target_ke[dof_start] = material.get(
+                "physics:stretchStiffness", builder.joint_target_ke[dof_start]
+            )
+            builder.joint_target_kd[dof_start] = material.get(
+                "newton:stretchDamping", builder.joint_target_kd[dof_start]
+            )
+        if dof_start + 1 < len(builder.joint_target_ke):
+            builder.joint_target_ke[dof_start + 1] = material.get(
+                "physics:bendStiffness", builder.joint_target_ke[dof_start + 1]
+            )
+            builder.joint_target_kd[dof_start + 1] = material.get(
+                "newton:bendDamping", builder.joint_target_kd[dof_start + 1]
+            )
+
+    stretch_values = [m["physics:stretchStiffness"] for m in segment_materials if "physics:stretchStiffness" in m]
+    bend_values = [m["physics:bendStiffness"] for m in segment_materials if "physics:bendStiffness" in m]
+    if len({round(r, 12) for r in edge_radii}) > 1 or len({round(v, 12) for v in stretch_values}) > 1:
+        print(
+            f"[subset] {label}: applied segment overrides "
+            f"radius={_format_range(edge_radii)} stretch={_format_range(stretch_values)} bend={_format_range(bend_values)}"
+        )
+    return edge_radii
 
 
 def _wrap_in_articulation(prim: Usd.Prim) -> bool:
@@ -182,11 +297,22 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
         radius = _curve_radius(curves, material)
         closed = curves.GetWrapAttr().Get() == UsdGeom.Tokens.periodic
         wrap = _wrap_in_articulation(prim)
+        segment_counts = [count if closed else max(count - 1, 0) for count in counts]
+        all_segment_materials = _curve_segment_materials(prim, sum(segment_counts), material)
+        all_segment_radii = [
+            _segment_radius(curves, segment_idx, segment_material, radius)
+            for segment_idx, segment_material in enumerate(all_segment_materials)
+        ]
 
         offset = 0
+        segment_offset = 0
         for curve_index, count in enumerate(counts):
             positions = all_positions[offset : offset + count]
+            segment_count = segment_counts[curve_index]
+            segment_materials = all_segment_materials[segment_offset : segment_offset + segment_count]
+            segment_radii = all_segment_radii[segment_offset : segment_offset + segment_count]
             offset += count
+            segment_offset += segment_count
             if len(positions) < 2:
                 print(f"[warn] {path}[{curve_index}]: need at least 2 curve points, skipping")
                 continue
@@ -198,7 +324,9 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 "curve_index": curve_index,
                 "positions": positions,
                 "material": material,
-                "radius": radius,
+                "segment_materials": segment_materials,
+                "segment_radii": segment_radii,
+                "radius": segment_radii[0] if segment_radii else radius,
                 "closed": closed,
                 "wrap": wrap,
             }
@@ -281,6 +409,14 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 wrap_in_articulation=rec["wrap"],
                 label=label,
             )
+            edge_radii = _apply_segment_material_overrides(
+                builder,
+                body_ids,
+                joint_ids,
+                rec["segment_materials"],
+                rec["segment_radii"],
+                rec["key"],
+            )
             for i, body_a in enumerate(body_ids):
                 for body_b in body_ids[i + 1 :]:
                     for shape_a in builder.body_shapes.get(body_a, []):
@@ -300,7 +436,7 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 "positions": positions,
                 "half_lengths": half_lengths,
                 "edges_list": edges,
-                "radii": [rec["radius"]] * len(body_ids),
+                "radii": edge_radii or [rec["radius"]] * len(body_ids),
                 "prim": rec["prim"],
                 "curve_index": rec["curve_index"],
                 "node_to_bodies": dict(node_to_bodies),
@@ -386,21 +522,41 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
             label=label,
         )
 
-        per_curve_edges: dict[str, list[tuple[int, int, int]]] = defaultdict(list)
+        graph_segment_materials: list[dict[str, float]] = []
+        graph_segment_radii: list[float] = []
+        for key, u, v in graph_edge_records:
+            rec = curves_by_path[key]
+            segment_idx = u if v == u + 1 else len(rec["segment_materials"]) - 1
+            segment_idx = min(max(segment_idx, 0), max(len(rec["segment_materials"]) - 1, 0))
+            graph_segment_materials.append(
+                rec["segment_materials"][segment_idx] if rec["segment_materials"] else rec["material"]
+            )
+            graph_segment_radii.append(rec["segment_radii"][segment_idx] if rec["segment_radii"] else rec["radius"])
+        graph_edge_radii = _apply_segment_material_overrides(
+            builder,
+            body_ids,
+            joint_ids,
+            graph_segment_materials,
+            graph_segment_radii,
+            component_key,
+        )
+
+        per_curve_edges: dict[str, list[tuple[int, int, int, int]]] = defaultdict(list)
         node_to_bodies_by_curve: dict[str, dict[int, list[int]]] = defaultdict(lambda: defaultdict(list))
         for edge_idx, (key, u, v) in enumerate(graph_edge_records):
             if edge_idx >= len(body_ids):
                 continue
             body_id = body_ids[edge_idx]
-            per_curve_edges[key].append((u, v, body_id))
+            per_curve_edges[key].append((u, v, body_id, edge_idx))
             node_to_bodies_by_curve[key][u].append(body_id)
             node_to_bodies_by_curve[key][v].append(body_id)
 
         for key in keys:
             rec = curves_by_path[key]
             curve_edges = per_curve_edges.get(key, [])
-            curve_body_ids = [body_id for _, _, body_id in curve_edges]
-            edges = [(u, v) for u, v, _ in curve_edges]
+            curve_body_ids = [body_id for _, _, body_id, _ in curve_edges]
+            edges = [(u, v) for u, v, _, _ in curve_edges]
+            edge_indices = [edge_idx for _, _, _, edge_idx in curve_edges]
             positions = rec["positions"]
             half_lengths = [float(wp.length(positions[v] - positions[u])) / 2.0 for u, v in edges]
             rod_info[key] = {
@@ -410,7 +566,11 @@ def parse_rods(stage: Usd.Stage, builder: newton.ModelBuilder) -> dict:
                 "positions": positions,
                 "half_lengths": half_lengths,
                 "edges_list": edges,
-                "radii": [rec["radius"]] * len(curve_body_ids),
+                "radii": (
+                    [graph_edge_radii[i] for i in edge_indices]
+                    if graph_edge_radii
+                    else [rec["radius"]] * len(curve_body_ids)
+                ),
                 "prim": rec["prim"],
                 "curve_index": rec["curve_index"],
                 "node_to_bodies": {idx: bodies for idx, bodies in node_to_bodies_by_curve[key].items()},
