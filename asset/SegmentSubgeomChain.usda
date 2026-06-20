@@ -1,0 +1,182 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    doc = """Example: AOUSD curve-deformable chain with per-segment material variation.
+
+    This file demonstrates the reviewer-suggested subgeometry approach for a rod
+    whose segment radius and material parameters vary by region. A single
+    BasisCurves prim owns the simulation topology. Segment-level variation is
+    expressed through imaging-safe segment-region prims. OpenUSD core supports
+    GeomSubset elementType = "segment" for curves, but current usdImaging/Hydra
+    warns for segment GeomSubsets, so this example uses Scope prims carrying
+    `uniform token physics:elementType = "segment"`, `int[] physics:indices`,
+    and a material binding.
+
+    Segment index convention:
+      segment i connects points[i] -> points[i + 1].
+
+    Subsets:
+      segments 0-2:  soft/thin rubber
+      segments 3-5:  medium/default rubber
+      segments 6-8:  stiff/thick reinforced region
+      segments 9-11: dense/damped tip region
+
+    The float[] widths array is authored to match the visible taper. The physical
+    curve thickness is owned by the bound materials; an importer should resolve
+    each segment's material from the segment-region material binding and derive
+    per-segment radius/stiffness from that material."""
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def Xform "rod"
+    {
+        def Xform "curve_0" (
+            apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+        )
+        {
+            rel material:binding = </World/Looks/DefaultRubberMaterial> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+
+            def BasisCurves "visual" (
+                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI", "MaterialBindingAPI"]
+            )
+            {
+                uniform token[] curveType = ["linear"]
+                int[] curveVertexCounts = [13]
+                point3f[] points = [
+                    (-0.36, 0, 0.55),
+                    (-0.30, 0, 0.535),
+                    (-0.24, 0, 0.520),
+                    (-0.18, 0, 0.505),
+                    (-0.12, 0, 0.495),
+                    (-0.06, 0, 0.490),
+                    ( 0.00, 0, 0.490),
+                    ( 0.06, 0, 0.495),
+                    ( 0.12, 0, 0.510),
+                    ( 0.18, 0, 0.535),
+                    ( 0.24, 0, 0.565),
+                    ( 0.30, 0, 0.595),
+                    ( 0.36, 0, 0.620)
+                ]
+                uniform token type = "linear"
+                uniform token wrap = "nonperiodic"
+                float[] widths = [
+                    0.004, 0.004, 0.004, 0.006, 0.006, 0.006,
+                    0.010, 0.010, 0.010, 0.007, 0.007, 0.007, 0.007
+                ]
+
+                def Scope "segment_material_regions"
+                {
+                    def Scope "segments_soft_thin"
+                    {
+                        uniform token physics:elementType = "segment"
+                        int[] physics:indices = [0, 1, 2]
+                        rel material:binding = </World/Looks/SoftThinMaterial>
+                    }
+
+                    def Scope "segments_default"
+                    {
+                        uniform token physics:elementType = "segment"
+                        int[] physics:indices = [3, 4, 5]
+                        rel material:binding = </World/Looks/DefaultRubberMaterial>
+                    }
+
+                    def Scope "segments_stiff_thick"
+                    {
+                        uniform token physics:elementType = "segment"
+                        int[] physics:indices = [6, 7, 8]
+                        rel material:binding = </World/Looks/StiffThickMaterial>
+                    }
+
+                    def Scope "segments_damped_tip"
+                    {
+                        uniform token physics:elementType = "segment"
+                        int[] physics:indices = [9, 10, 11]
+                        rel material:binding = </World/Looks/DampedTipMaterial>
+                    }
+                }
+            }
+
+            def PhysicsAttachment "fixed_point_0"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = [(-0.36, 0, 0.55)]
+                float physics:damping = 0
+                int[] physics:indices0 = [0]
+                int[] physics:indices1 = []
+                rel physics:src0 = </World/rod/curve_0/visual>
+                rel physics:src1 = </World>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "xform"
+            }
+        }
+    }
+
+    def Scope "Looks"
+    {
+        def Material "SoftThinMaterial" (
+            prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]
+        )
+        {
+            float physics:thickness = 0.004
+            float physics:stretchStiffness = 40000
+            float physics:bendStiffness = 120
+            float newton:stretchDamping = 0.0001
+            float newton:bendDamping = 0.002
+            float physics:dynamicFriction = 0.6
+            float physics:staticFriction = 0.8
+            float newton:contactStiffness = 80
+            float newton:contactDamping = 1
+        }
+
+        def Material "DefaultRubberMaterial" (
+            prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]
+        )
+        {
+            float physics:thickness = 0.006
+            float physics:stretchStiffness = 100000
+            float physics:bendStiffness = 500
+            float newton:stretchDamping = 0.0002
+            float newton:bendDamping = 0.004
+            float physics:dynamicFriction = 0.5
+            float physics:staticFriction = 0.7
+            float newton:contactStiffness = 100
+            float newton:contactDamping = 1
+        }
+
+        def Material "StiffThickMaterial" (
+            prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]
+        )
+        {
+            float physics:thickness = 0.010
+            float physics:stretchStiffness = 350000
+            float physics:bendStiffness = 3500
+            float newton:stretchDamping = 0.0003
+            float newton:bendDamping = 0.006
+            float physics:dynamicFriction = 0.45
+            float physics:staticFriction = 0.65
+            float newton:contactStiffness = 150
+            float newton:contactDamping = 1.5
+        }
+
+        def Material "DampedTipMaterial" (
+            prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]
+        )
+        {
+            float physics:thickness = 0.007
+            float physics:stretchStiffness = 180000
+            float physics:bendStiffness = 900
+            float newton:stretchDamping = 0.002
+            float newton:bendDamping = 0.05
+            float physics:dynamicFriction = 0.7
+            float physics:staticFriction = 0.9
+            float newton:contactStiffness = 120
+            float newton:contactDamping = 4
+        }
+    }
+}

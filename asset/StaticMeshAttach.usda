@@ -1,9 +1,9 @@
 #usda 1.0
 (
     defaultPrim = "World"
-    doc = """Test: cable attached directly to static Mesh prims via newton:body.
+    doc = """Test: cable attached directly to static Mesh prims via PhysicsAttachment.
 
-    Demonstrates that newton:body can target any prim carrying PhysicsRigidBodyAPI,
+    Demonstrates that PhysicsAttachment can target any prim carrying PhysicsRigidBodyAPI,
     including a def Mesh (not just Cube/Sphere shorthand primitives).
 
     Layout:
@@ -13,7 +13,7 @@
              node 29 attached to BracketRight.
 
     Tests:
-      - newton:body relationship pointing to a def Mesh prim (real mesh topology)
+      - physics:src1 relationship pointing to a def Mesh prim (real mesh topology)
       - Kinematic world-anchored mesh bodies (no parent joint, no ArticulationRoot needed)
       - Cable freely hangs between two static mesh anchors under gravity
       - PhysicsCollisionAPI on mesh allows cable capsules to rest on bracket surface"""
@@ -49,70 +49,73 @@ def Xform "World"
         uniform token[] xformOpOrder = ["xformOp:translate"]
     }
 
-    def Xform "rod" (
-        prepend apiSchemas = ["NewtonRodAPI", "MaterialBindingAPI"]
-    )
+    def Xform "rod"
     {
-        rel material:binding = </World/Looks/CablePhysicsMaterial> (
-            bindMaterialAs = "weakerThanDescendants"
-        )
-        float[] newton:bendDamping = [0.1]
-        float[] newton:bendStiffness = [5806.824]
-        float newton:contact_kd = 1
-        float newton:contact_ke = 100
-        int2[] newton:edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9), (9, 10), (10, 11), (11, 12), (12, 13), (13, 14), (14, 15), (15, 16), (16, 17), (17, 18), (18, 19), (19, 20), (20, 21), (21, 22), (22, 23), (23, 24), (24, 25), (25, 26), (26, 27), (27, 28), (28, 29)]
-        point3f[] newton:points = [(-0.35, 0, 0.65), (-0.32586, 0, 0.63002), (-0.30172, 0, 0.61147), (-0.27759, 0, 0.59435), (-0.25345, 0, 0.57866), (-0.22931, 0, 0.56439), (-0.20517, 0, 0.55155), (-0.18103, 0, 0.54013), (-0.1569, 0, 0.53014), (-0.13276, 0, 0.52158), (-0.10862, 0, 0.51445), (-0.08448, 0, 0.50874), (-0.06034, 0, 0.50446), (-0.03621, 0, 0.50161), (-0.01207, 0, 0.50018), (0.01207, 0, 0.50018), (0.03621, 0, 0.50161), (0.06034, 0, 0.50446), (0.08448, 0, 0.50874), (0.10862, 0, 0.51445), (0.13276, 0, 0.52158), (0.1569, 0, 0.53014), (0.18103, 0, 0.54013), (0.20517, 0, 0.55155), (0.22931, 0, 0.56439), (0.25345, 0, 0.57866), (0.27759, 0, 0.59435), (0.30172, 0, 0.61147), (0.32586, 0, 0.63002), (0.35, 0, 0.65)]
-        float[] newton:radius = [0.0025]
-        float[] newton:stretchDamping = [0.00001]
-        float[] newton:stretchStiffness = [580682.44]
-        bool newton:wrapInArticulation = 1
-
-        def BasisCurves "visual" (
-            prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
+        def Xform "curve_0" (
+            apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
         )
         {
-            uniform token[] curveType = ["linear"]
-            int[] curveVertexCounts = [30]
-            int[] newton:rodPointIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
-            point3f[] points = [(-0.35, 0, 0.65), (-0.32586, 0, 0.63002), (-0.30172, 0, 0.61147), (-0.27759, 0, 0.59435), (-0.25345, 0, 0.57866), (-0.22931, 0, 0.56439), (-0.20517, 0, 0.55155), (-0.18103, 0, 0.54013), (-0.1569, 0, 0.53014), (-0.13276, 0, 0.52158), (-0.10862, 0, 0.51445), (-0.08448, 0, 0.50874), (-0.06034, 0, 0.50446), (-0.03621, 0, 0.50161), (-0.01207, 0, 0.50018), (0.01207, 0, 0.50018), (0.03621, 0, 0.50161), (0.06034, 0, 0.50446), (0.08448, 0, 0.50874), (0.10862, 0, 0.51445), (0.13276, 0, 0.52158), (0.1569, 0, 0.53014), (0.18103, 0, 0.54013), (0.20517, 0, 0.55155), (0.22931, 0, 0.56439), (0.25345, 0, 0.57866), (0.27759, 0, 0.59435), (0.30172, 0, 0.61147), (0.32586, 0, 0.63002), (0.35, 0, 0.65)]
-            uniform token type = "linear"
-            float[] widths = [0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005]
-            uniform token wrap = "nonperiodic"
-        }
+            rel material:binding = </World/Looks/CablePhysicsMaterial> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
 
-        def Xform "attachment_left" (
-            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-        )
-        {
-            rel newton:body = </World/BracketLeft>
-            point3f[] newton:localPos1 = [(0, 0, 0)]
-            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
-            quatf[] newton:localRot1 = [(1, 0, 0, 0)]
-            int[] newton:nodeIndices = [0]
-        }
+            def BasisCurves "visual" (
+                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+            )
+            {
+                uniform token[] curveType = ["linear"]
+                int[] curveVertexCounts = [30]
+                point3f[] points = [(-0.35, 0, 0.65), (-0.32586, 0, 0.63002), (-0.30172, 0, 0.61147), (-0.27759, 0, 0.59435), (-0.25345, 0, 0.57866), (-0.22931, 0, 0.56439), (-0.20517, 0, 0.55155), (-0.18103, 0, 0.54013), (-0.1569, 0, 0.53014), (-0.13276, 0, 0.52158), (-0.10862, 0, 0.51445), (-0.08448, 0, 0.50874), (-0.06034, 0, 0.50446), (-0.03621, 0, 0.50161), (-0.01207, 0, 0.50018), (0.01207, 0, 0.50018), (0.03621, 0, 0.50161), (0.06034, 0, 0.50446), (0.08448, 0, 0.50874), (0.10862, 0, 0.51445), (0.13276, 0, 0.52158), (0.1569, 0, 0.53014), (0.18103, 0, 0.54013), (0.20517, 0, 0.55155), (0.22931, 0, 0.56439), (0.25345, 0, 0.57866), (0.27759, 0, 0.59435), (0.30172, 0, 0.61147), (0.32586, 0, 0.63002), (0.35, 0, 0.65)]
+                uniform token type = "linear"
+                float[] widths = [0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005]
+                uniform token wrap = "nonperiodic"
+            }
 
-        def Xform "attachment_right" (
-            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-        )
-        {
-            rel newton:body = </World/BracketRight>
-            point3f[] newton:localPos1 = [(0, 0, 0)]
-            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
-            quatf[] newton:localRot1 = [(1, 0, 0, 0)]
-            int[] newton:nodeIndices = [29]
+            def PhysicsAttachment "attachment_left"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = [(0, 0, 0)]
+                float physics:damping = 0
+                int[] physics:indices0 = [0]
+                int[] physics:indices1 = []
+                rel physics:src0 = </World/rod/curve_0/visual>
+                rel physics:src1 = </World/BracketLeft>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "xform"
+            }
+
+            def PhysicsAttachment "attachment_right"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = [(0, 0, 0)]
+                float physics:damping = 0
+                int[] physics:indices0 = [29]
+                int[] physics:indices1 = []
+                rel physics:src0 = </World/rod/curve_0/visual>
+                rel physics:src1 = </World/BracketRight>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "xform"
+            }
         }
     }
 
     def Scope "Looks"
     {
         def Material "CablePhysicsMaterial" (
-            prepend apiSchemas = ["PhysicsMaterialAPI", "NewtonMaterialAPI"]
+            prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]
         )
         {
+            float newton:bendDamping = 0.1
             float newton:contactDamping = 1
             float newton:contactStiffness = 100
+            float newton:stretchDamping = 0.00001
+            float physics:bendStiffness = 5806.824
             float physics:dynamicFriction = 0.5
             float physics:staticFriction = 0.5
+            float physics:stretchStiffness = 580682.44
+            float physics:thickness = 0.005
         }
     }
 }
