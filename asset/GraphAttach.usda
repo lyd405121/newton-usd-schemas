@@ -13,8 +13,8 @@
       SlotC      (static cube) --revolute X--> ConnectorC --> cable node 15
 
     Each assembly has PhysicsArticulationRootAPI on the top Xform.
-    The cable is wrapInArticulation=true, creating its own articulation.
-    Four NewtonRodAttachmentAPI prims link cable endpoints to the cube bodies.
+    The cable follows AOUSD curve-deformable authoring and uses NewtonArticulationRootAPI for importer articulation wrapping.
+    Four PhysicsAttachment prims link cable endpoints to the cube bodies.
 
     Tests:
       - Cable attached to bodies that are themselves children in articulations
@@ -181,131 +181,191 @@ def Xform "World"
         }
     }
 
-    def Xform "rod_graph" (
-        prepend apiSchemas = ["NewtonRodAPI", "MaterialBindingAPI"]
-    )
+    def Xform "rod_graph"
     {
-        rel material:binding = </World/Looks/CablePhysicsMaterial> (
-            bindMaterialAs = "weakerThanDescendants"
-        )
-        float[] newton:bendDamping = [0.002, 0.002, 0.002, 0.002, 0.002, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
-        float[] newton:bendStiffness = [5000, 5000, 5000, 5000, 5000, 5000, 1000, 500, 200, 1000, 500, 200, 1000, 500, 200]
-        float newton:contact_kd = 1
-        float newton:contact_ke = 100
-        int2[] newton:edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (2, 7), (7, 8), (8, 9), (2, 10), (10, 11), (11, 12), (5, 13), (13, 14), (14, 15)]
-        point3f[] newton:points = [(-0.3, 0, 0.5), (-0.2, 0, 0.5), (-0.1, 0, 0.5), (0, 0, 0.5), (0.1, 0, 0.5), (0.2, 0, 0.5), (0.3, 0, 0.5), (-0.1, 0.08, 0.485), (-0.1, 0.16, 0.465), (-0.1, 0.24, 0.44), (-0.1, -0.08, 0.485), (-0.1, -0.16, 0.465), (-0.1, -0.24, 0.44), (0.2, 0.08, 0.485), (0.2, 0.16, 0.465), (0.2, 0.24, 0.44)]
-        float[] newton:radius = [0.005]
-        float[] newton:stretchDamping = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        float[] newton:stretchStiffness = [300000, 300000, 300000, 300000, 300000, 300000, 150000, 100000, 80000, 150000, 100000, 80000, 150000, 100000, 80000]
-        bool newton:wrapInArticulation = 1
-
-        def BasisCurves "visual_trunk" (
-            prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
+        def Xform "curve_0" (
+            apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
         )
         {
-            uniform token[] curveType = ["linear"]
-            int[] curveVertexCounts = [7]
-            int[] newton:rodPointIndices = [0, 1, 2, 3, 4, 5, 6]
-            point3f[] points = [(-0.3, 0, 0.5), (-0.2, 0, 0.5), (-0.1, 0, 0.5), (0, 0, 0.5), (0.1, 0, 0.5), (0.2, 0, 0.5), (0.3, 0, 0.5)]
-            uniform token type = "linear"
-            float[] widths = [0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
-            uniform token wrap = "nonperiodic"
-        }
+            rel material:binding = </World/Looks/CablePhysicsMaterial> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
 
-        def BasisCurves "visual_branchA" (
-            prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
-        )
-        {
-            uniform token[] curveType = ["linear"]
-            int[] curveVertexCounts = [4]
-            int[] newton:rodPointIndices = [2, 7, 8, 9]
-            point3f[] points = [(-0.1, 0, 0.5), (-0.1, 0.08, 0.485), (-0.1, 0.16, 0.465), (-0.1, 0.24, 0.44)]
-            uniform token type = "linear"
-            float[] widths = [0.01, 0.009, 0.008, 0.007]
-            uniform token wrap = "nonperiodic"
-        }
+            def BasisCurves "visual_trunk" (
+                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+            )
+            {
+                uniform token[] curveType = ["linear"]
+                int[] curveVertexCounts = [7]
+                point3f[] points = [(-0.3, 0, 0.5), (-0.2, 0, 0.5), (-0.1, 0, 0.5), (0, 0, 0.5), (0.1, 0, 0.5), (0.2, 0, 0.5), (0.3, 0, 0.5)]
+                uniform token type = "linear"
+                float[] widths = [0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+                uniform token wrap = "nonperiodic"
+            }
 
-        def BasisCurves "visual_branchB" (
-            prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
-        )
-        {
-            uniform token[] curveType = ["linear"]
-            int[] curveVertexCounts = [4]
-            int[] newton:rodPointIndices = [2, 10, 11, 12]
-            point3f[] points = [(-0.1, 0, 0.5), (-0.1, -0.08, 0.485), (-0.1, -0.16, 0.465), (-0.1, -0.24, 0.44)]
-            uniform token type = "linear"
-            float[] widths = [0.01, 0.009, 0.008, 0.007]
-            uniform token wrap = "nonperiodic"
-        }
+            def BasisCurves "visual_branchA" (
+                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+            )
+            {
+                uniform token[] curveType = ["linear"]
+                int[] curveVertexCounts = [4]
+                point3f[] points = [(-0.1, 0, 0.5), (-0.1, 0.08, 0.485), (-0.1, 0.16, 0.465), (-0.1, 0.24, 0.44)]
+                uniform token type = "linear"
+                float[] widths = [0.01, 0.009, 0.008, 0.007]
+                uniform token wrap = "nonperiodic"
+            }
 
-        def BasisCurves "visual_branchC" (
-            prepend apiSchemas = ["NewtonRodVisualCurveAPI"]
-        )
-        {
-            uniform token[] curveType = ["linear"]
-            int[] curveVertexCounts = [4]
-            int[] newton:rodPointIndices = [5, 13, 14, 15]
-            point3f[] points = [(0.2, 0, 0.5), (0.2, 0.08, 0.485), (0.2, 0.16, 0.465), (0.2, 0.24, 0.44)]
-            uniform token type = "linear"
-            float[] widths = [0.01, 0.009, 0.008, 0.007]
-            uniform token wrap = "nonperiodic"
-        }
+            def BasisCurves "visual_branchB" (
+                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+            )
+            {
+                uniform token[] curveType = ["linear"]
+                int[] curveVertexCounts = [4]
+                point3f[] points = [(-0.1, 0, 0.5), (-0.1, -0.08, 0.485), (-0.1, -0.16, 0.465), (-0.1, -0.24, 0.44)]
+                uniform token type = "linear"
+                float[] widths = [0.01, 0.009, 0.008, 0.007]
+                uniform token wrap = "nonperiodic"
+            }
 
-        def Xform "attachment_trunk" (
-            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-        )
-        {
-            rel newton:body = </World/Assembly0/MountCube>
-            point3f[] newton:localPos1 = [(0, 0, 0)]
-            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
-            quatf[] newton:localRot1 = [(1, 0, 0, 0)]
-            int[] newton:nodeIndices = [0]
-        }
+            def BasisCurves "visual_branchC" (
+                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+            )
+            {
+                uniform token[] curveType = ["linear"]
+                int[] curveVertexCounts = [4]
+                point3f[] points = [(0.2, 0, 0.5), (0.2, 0.08, 0.485), (0.2, 0.16, 0.465), (0.2, 0.24, 0.44)]
+                uniform token type = "linear"
+                float[] widths = [0.01, 0.009, 0.008, 0.007]
+                uniform token wrap = "nonperiodic"
+            }
 
-        def Xform "attachment_connA" (
-            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-        )
-        {
-            rel newton:body = </World/AssemblyA/ConnectorA>
-            point3f[] newton:localPos1 = [(0, 0, -0.005)]
-            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
-            quatf[] newton:localRot1 = [(1, 0, 0, 0)]
-            int[] newton:nodeIndices = [9]
-        }
 
-        def Xform "attachment_connB" (
-            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-        )
-        {
-            rel newton:body = </World/AssemblyB/ConnectorB>
-            point3f[] newton:localPos1 = [(0, 0, -0.005)]
-            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
-            quatf[] newton:localRot1 = [(1, 0, 0, 0)]
-            int[] newton:nodeIndices = [12]
-        }
+            def PhysicsAttachment "junction_branchA"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = []
+                float physics:damping = 0
+                int[] physics:indices0 = [0]
+                int[] physics:indices1 = [2]
+                rel physics:src0 = </World/rod_graph/curve_0/visual_branchA>
+                rel physics:src1 = </World/rod_graph/curve_0/visual_trunk>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "point"
+            }
 
-        def Xform "attachment_connC" (
-            prepend apiSchemas = ["NewtonRodAttachmentAPI"]
-        )
-        {
-            rel newton:body = </World/AssemblyC/ConnectorC>
-            point3f[] newton:localPos1 = [(0, 0, -0.005)]
-            quatf[] newton:localRot0 = [(1, 0, 0, 0)]
-            quatf[] newton:localRot1 = [(0.70710677, 0, 0, -0.70710677)]
-            int[] newton:nodeIndices = [15]
+            def PhysicsAttachment "junction_branchB"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = []
+                float physics:damping = 0
+                int[] physics:indices0 = [0]
+                int[] physics:indices1 = [2]
+                rel physics:src0 = </World/rod_graph/curve_0/visual_branchB>
+                rel physics:src1 = </World/rod_graph/curve_0/visual_trunk>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "point"
+            }
+
+            def PhysicsAttachment "junction_branchC"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = []
+                float physics:damping = 0
+                int[] physics:indices0 = [0]
+                int[] physics:indices1 = [5]
+                rel physics:src0 = </World/rod_graph/curve_0/visual_branchC>
+                rel physics:src1 = </World/rod_graph/curve_0/visual_trunk>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "point"
+            }
+
+            def PhysicsAttachment "attachment_trunk"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = [(0, 0, 0)]
+                float physics:damping = 0
+                int[] physics:indices0 = [0]
+                int[] physics:indices1 = []
+                rel physics:src0 = </World/rod_graph/curve_0/visual_trunk>
+                rel physics:src1 = </World/Assembly0/MountCube>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "xform"
+            }
+
+            def PhysicsAttachment "attachment_connA"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = [(0, 0, -0.005)]
+                float physics:damping = 0
+                int[] physics:indices0 = [3]
+                int[] physics:indices1 = []
+                rel physics:src0 = </World/rod_graph/curve_0/visual_branchA>
+                rel physics:src1 = </World/AssemblyA/ConnectorA>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "xform"
+            }
+
+            def PhysicsAttachment "attachment_connB"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = [(0, 0, -0.005)]
+                float physics:damping = 0
+                int[] physics:indices0 = [3]
+                int[] physics:indices1 = []
+                rel physics:src0 = </World/rod_graph/curve_0/visual_branchB>
+                rel physics:src1 = </World/AssemblyB/ConnectorB>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "xform"
+            }
+
+            def PhysicsAttachment "attachment_connC"
+            {
+                vector3f[] physics:coords0 = []
+                vector3f[] physics:coords1 = [(0, 0, -0.005)]
+                float physics:damping = 0
+                int[] physics:indices0 = [3]
+                int[] physics:indices1 = []
+                rel physics:src0 = </World/rod_graph/curve_0/visual_branchC>
+                rel physics:src1 = </World/AssemblyC/ConnectorC>
+                float physics:stiffness = inf
+                uniform token physics:type0 = "point"
+                uniform token physics:type1 = "xform"
+            }
+
+            def PhysicsElementCollisionFilter "filter_branchC_slotC"
+            {
+                bool physics:filterEnabled = true
+                rel physics:src0 = </World/rod_graph/curve_0/visual_branchC>
+                rel physics:src1 = </World/AssemblyC/SlotC>
+                int[] physics:groupElemCounts0 = [3]
+                int[] physics:groupElemIndices0 = [0, 1, 2]
+                int[] physics:groupElemCounts1 = []
+                int[] physics:groupElemIndices1 = []
+            }
         }
     }
 
     def Scope "Looks"
     {
         def Material "CablePhysicsMaterial" (
-            prepend apiSchemas = ["PhysicsMaterialAPI", "NewtonMaterialAPI"]
+            prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]
         )
         {
+            float newton:bendDamping = 0.002
             float newton:contactDamping = 1
             float newton:contactStiffness = 100
+            float newton:stretchDamping = 0
+            float physics:bendStiffness = 5000
             float physics:dynamicFriction = 0.5
             float physics:staticFriction = 0.5
+            float physics:stretchStiffness = 300000
+            float physics:thickness = 0.01
         }
     }
 }
