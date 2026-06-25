@@ -164,7 +164,16 @@ def _ancestor_has_api(prim: Usd.Prim, api_name: str) -> bool:
 
 def _curve_points(curves: UsdGeom.BasisCurves) -> list[wp.vec3]:
     pts = curves.GetPointsAttr().Get()
-    return [wp.vec3(float(p[0]), float(p[1]), float(p[2])) for p in (pts or [])]
+    if not pts:
+        return []
+    from pxr import Gf, Usd as _Usd
+    xform = UsdGeom.Xformable(curves)
+    mat = xform.ComputeLocalToWorldTransform(_Usd.TimeCode.Default())
+    result = []
+    for p in pts:
+        pw = mat.Transform(Gf.Vec3d(float(p[0]), float(p[1]), float(p[2])))
+        result.append(wp.vec3(float(pw[0]), float(pw[1]), float(pw[2])))
+    return result
 
 
 def _curve_vertex_counts(curves: UsdGeom.BasisCurves, n_points: int) -> list[int]:
