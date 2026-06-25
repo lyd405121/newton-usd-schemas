@@ -1,0 +1,67 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    doc = """Sample: a self-intersecting AOUSD curve filtered with PhysicsElementCollisionFilter.
+
+Segments 0 and 3 cross at the center of the X-shaped cable. The filter is
+self-referential: src0 and src1 both point to the same BasisCurves prim, while
+the two element groups select only the crossing segments."""
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def Xform "rod"
+    {
+        def Xform "curve_0" (
+            prepend apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+        )
+        {
+            rel material:binding = </World/Looks/CablePhysicsMaterial> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+
+            def BasisCurves "visual" (
+                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+            )
+            {
+                uniform token[] curveType = ["linear"]
+                int[] curveVertexCounts = [5]
+                point3f[] points = [(-0.12, -0.10, 0.45), (0.12, 0.10, 0.45), (0.20, 0.16, 0.45), (-0.12, 0.12, 0.45), (0.12, -0.12, 0.45)]
+                uniform token type = "linear"
+                float[] widths = [0.02, 0.02, 0.02, 0.02, 0.02]
+                uniform token wrap = "nonperiodic"
+            }
+
+            def PhysicsElementCollisionFilter "filter_self_crossing"
+            {
+                bool physics:filterEnabled = true
+                rel physics:src0 = </World/rod/curve_0/visual>
+                rel physics:src1 = </World/rod/curve_0/visual>
+                int[] physics:groupElemCounts0 = [1]
+                int[] physics:groupElemIndices0 = [0]
+                int[] physics:groupElemCounts1 = [1]
+                int[] physics:groupElemIndices1 = [3]
+            }
+        }
+    }
+
+    def Scope "Looks"
+    {
+        def Material "CablePhysicsMaterial" (
+            prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]
+        )
+        {
+            float newton:bendDamping = 0.1
+            float newton:contactDamping = 1
+            float newton:contactStiffness = 100
+            float newton:stretchDamping = 0.00001
+            float physics:bendStiffness = 1000
+            float physics:dynamicFriction = 0.5
+            float physics:staticFriction = 0.5
+            float physics:stretchStiffness = 100000
+            float physics:thickness = 0.02
+        }
+    }
+}
