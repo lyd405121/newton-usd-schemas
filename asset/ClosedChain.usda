@@ -43,6 +43,17 @@ def Xform "World"
                 float[] widths = [0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008, 0.008]
                 uniform token wrap = "periodic"
             }
+
+            def PhysicsElementCollisionFilter "filter_adjacent_segments"
+            {
+                bool physics:filterEnabled = true
+                rel physics:src0 = </World/ring/curve_0/visual>
+                rel physics:src1 = </World/ring/curve_0/visual>
+                int[] physics:groupElemCounts0 = []
+                int[] physics:groupElemIndices0 = []
+                int[] physics:groupElemCounts1 = []
+                int[] physics:groupElemIndices1 = []
+            }
         }
     }
 
