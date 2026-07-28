@@ -351,6 +351,145 @@ class NewtonArticulationRootAPI "NewtonArticulationRootAPI" (
 
         When disabled, this is equivalent to applying `PhysicsFilteredPairsAPI` relationships between all bodies in the articulation."""
     )
+
+    uniform bool newton:jointsAddMobility = false (
+        doc = """Whether joints within this articulation add mobility or constrain it.
+
+        When false (default), joints constrain degrees of freedom between
+        otherwise-free bodies.
+
+        When true, multiple single-DOF joints connecting the same body pair
+        (stacked joints) add degrees of freedom to bodies that would
+        otherwise be rigidly attached. Engines that do not support the
+        stacked representation may merge them into a compound joint or
+        emit a warning. DOF ordering within stacked joints is determined
+        by traversal order."""
+    )
+}
+
+class NewtonJointAPI "NewtonJointAPI" (
+    doc = """`NewtonJointAPI` applies on top of a `PhysicsJoint`, providing
+    joint configuration for solver behavior, passive dynamics, and limit spring response.
+
+    All scalar attributes broadcast uniformly to every DOF of the joint.
+    Angular attributes use degrees."""
+)
+{
+    float newton:armature = 0 (
+        doc = """Additional diagonal inertia added to each degree of freedom,
+        representing reflected inertia from co-rotating elements (gears,
+        rotors, transmissions) and/or solver regularization.
+
+        In reduced-coordinate solvers this augments the joint-space mass
+        matrix diagonal. In maximal-coordinate solvers it regularizes the
+        constraint system along the joint's DOF directions.
+
+        The value is broadcast to all DOFs of the joint.
+
+        Range: [0, inf)
+        Units: mass * distance * distance (angular DOFs) or mass (linear DOFs)."""
+        limits = {
+            dictionary hard = {
+                float minimum = 0
+            }
+        }
+    )
+
+    float newton:damping = 0 (
+        doc = """Passive velocity-proportional damping applied to each DOF.
+
+        Produces a resistive effort proportional to joint velocity:
+        `effort = -damping * velocity`. This damping is always active,
+        regardless of whether limits are violated or drive targets are set.
+
+        The value is broadcast to all DOFs of the joint.
+
+        Range: [0, inf)
+        Units: effort * seconds / degrees (angular DOFs) or effort * seconds / distance (linear DOFs)."""
+        limits = {
+            dictionary hard = {
+                float minimum = 0
+            }
+        }
+    )
+
+    float newton:friction = 0 (
+        doc = """Dry (Coulomb) friction effort opposing joint motion.
+
+        A constant resistive effort that opposes the direction of motion,
+        independent of velocity magnitude. Solvers that implement this as
+        a constraint may also resist motion at zero velocity (static
+        friction up to the specified magnitude).
+
+        The value is broadcast to all DOFs of the joint.
+
+        Range: [0, inf)
+        Units: effort."""
+        limits = {
+            dictionary hard = {
+                float minimum = 0
+            }
+        }
+    )
+
+    float newton:velocityLimit = inf (
+        doc = """Maximum allowable DOF velocity.
+
+        The solver clamps each DOF's velocity to the range
+        `[-velocityLimit, +velocityLimit]` at every time step.
+        A value of `inf` means no velocity clamping is applied.
+
+        The value is broadcast to all DOFs of the joint.
+
+        Range: (0, inf]
+        Units: degrees / seconds (angular DOFs) or distance / seconds (linear DOFs)."""
+        limits = {
+            dictionary hard = {
+                float minimum = 0
+            }
+        }
+    )
+
+    float newton:limitStiffness = -inf (
+        doc = """Stiffness of the joint limit spring.
+
+        When a DOF's position exceeds the range defined by the joint limits,
+        a restoring effort is applied: `effort = limitStiffness * penetration`,
+        where penetration is the signed distance beyond the limit boundary.
+
+        A value of `inf` is interpreted as a hard limit: solvers that support
+        both soft and hard limits enforce the limit as a rigid positional
+        constraint (no spring). Note: some solvers may ignore this attribute
+        and always enforce hard positional constraints.
+
+        A value of `-inf` means the engine's own default stiffness is used.
+
+        The value is broadcast to all DOFs of the joint.
+
+        Range: [0, inf] when authored (sentinel `-inf` defers to engine default).
+        Units: effort / degrees (angular DOFs) or effort / distance (linear DOFs)."""
+    )
+
+    float newton:limitDamping = -inf (
+        doc = """Damping of the joint limit spring.
+
+        When a DOF's position exceeds the range defined by the joint limits,
+        a velocity-dependent dissipative effort is applied in any direction:
+        `effort = -limitDamping * velocity`. This damps all joint velocity
+        while the limit is exceeded, not only velocity in the penetrating
+        direction.
+
+        Ignored when `limitStiffness` is `inf` (hard limit): a hard limit has
+        no spring to damp. Note: some solvers may ignore this attribute and
+        always enforce hard positional constraints.
+
+        A value of `-inf` means the engine's own default damping is used.
+
+        The value is broadcast to all DOFs of the joint.
+
+        Range: [0, inf) when authored (sentinel `-inf` defers to engine default).
+        Units: effort * seconds / degrees (angular DOFs) or effort * seconds / distance (linear DOFs)."""
+    )
 }
 
 class NewtonMassAPI "NewtonMassAPI" (
