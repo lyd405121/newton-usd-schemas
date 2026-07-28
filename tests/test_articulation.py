@@ -42,6 +42,21 @@ class TestNewtonArticulationRootAPI(unittest.TestCase):
         self.assertTrue(attr.HasAuthoredValue())
         self.assertEqual(attr.Get(), False)
 
+    def test_joints_add_mobility_default(self):
+        self.prim.ApplyAPI("NewtonArticulationRootAPI")
+        attr = self.prim.GetAttribute("newton:jointsAddMobility")
+        self.assertIsNotNone(attr)
+        self.assertFalse(attr.HasAuthoredValue())
+        self.assertEqual(attr.Get(), False)
+
+    def test_joints_add_mobility_enabled(self):
+        self.prim.ApplyAPI("NewtonArticulationRootAPI")
+        attr = self.prim.GetAttribute("newton:jointsAddMobility")
+        success = attr.Set(True)
+        self.assertTrue(success)
+        self.assertTrue(attr.HasAuthoredValue())
+        self.assertEqual(attr.Get(), True)
+
 
 if __name__ == "__main__":
     unittest.main()

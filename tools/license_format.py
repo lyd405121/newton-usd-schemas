@@ -12,7 +12,7 @@ __copyright = "# SPDX-FileCopyrightText: Copyright (c) {years} The Newton Develo
 __identifier = "# SPDX-License-Identifier: Apache-2.0"
 # Escape special regex characters in the copyright template
 __copyright_template = re.escape(__copyright).replace(re.escape("{years}"), "{years}")
-__copyright_years = __copyright_template.replace("{years}", f"(?:2025|(?:20[0-9][0-4])-{datetime.now().year})")
+__copyright_years = __copyright_template.replace("{years}", f"(?:{datetime.now().year}|2025|(?:20[0-9][0-4])-{datetime.now().year})")
 __copyright_regex = re.compile(f"^{__copyright_years}$")
 
 
