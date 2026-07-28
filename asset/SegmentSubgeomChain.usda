@@ -34,7 +34,7 @@ def Xform "World"
     def Xform "rod"
     {
         def Xform "curve_0" (
-            apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+            apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI"]
         )
         {
             rel material:binding = </World/Looks/DefaultRubberMaterial> (

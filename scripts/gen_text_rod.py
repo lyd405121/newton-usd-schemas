@@ -19,15 +19,14 @@ from __future__ import annotations
 
 import argparse
 import math
-import sys
 from pathlib import Path
 
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Step 1: Render text to bitmap
 # ---------------------------------------------------------------------------
+
 
 def render_text_bitmap(
     text: str,
@@ -49,9 +48,7 @@ def render_text_bitmap(
             # space / invisible character — store advance only
             glyphs.append((np.zeros((1, 1), np.uint8), 0, 0, g.advance.x >> 6))
             continue
-        bm = np.frombuffer(bytes(g.bitmap.buffer), dtype=np.uint8).reshape(
-            g.bitmap.rows, g.bitmap.width
-        )
+        bm = np.frombuffer(bytes(g.bitmap.buffer), dtype=np.uint8).reshape(g.bitmap.rows, g.bitmap.width)
         glyphs.append((bm, g.bitmap_left, g.bitmap_top, g.advance.x >> 6))
 
     total_w = sum(g[3] for g in glyphs) + 2 * padding
@@ -68,7 +65,7 @@ def render_text_bitmap(
         rr0, cc0 = max(0, r0), max(0, c0)
         canvas[rr0:r1, cc0:c1] = np.maximum(
             canvas[rr0:r1, cc0:c1],
-            bm[rr0 - r0: r1 - r0, cc0 - c0: c1 - c0],
+            bm[rr0 - r0 : r1 - r0, cc0 - c0 : c1 - c0],
         )
         x += advance
 
@@ -78,6 +75,7 @@ def render_text_bitmap(
 # ---------------------------------------------------------------------------
 # Step 2: Threshold + skeletonize
 # ---------------------------------------------------------------------------
+
 
 def skeletonize_bitmap(
     bitmap: np.ndarray,
@@ -94,6 +92,7 @@ def skeletonize_bitmap(
 # ---------------------------------------------------------------------------
 # Step 3: Trace skeleton → graph
 # ---------------------------------------------------------------------------
+
 
 def _neighbors8(r: int, c: int, rows: int, cols: int):
     for dr in (-1, 0, 1):
@@ -141,6 +140,7 @@ def skeleton_to_graph(
 # ---------------------------------------------------------------------------
 # Step 4: Simplify graph (remove degree-2 chains → single edges)
 # ---------------------------------------------------------------------------
+
 
 def simplify_graph(
     nodes: list[tuple[int, int]],
@@ -214,7 +214,7 @@ def simplify_graph(
             return
 
         # Compute arc-length along chain
-        all_pts = [start_key] + chain_pixels + [end_key]
+        all_pts = [start_key, *chain_pixels, end_key]
         arc = [0.0]
         for i in range(1, len(all_pts)):
             ra, ca = nodes[all_pts[i - 1]]
@@ -222,9 +222,7 @@ def simplify_graph(
             arc.append(arc[-1] + math.hypot(ra - rb, ca - cb))
         total_len = arc[-1]
 
-        if total_len < min_branch_pixels and (
-            len(adj[start_key]) == 1 or len(adj[end_key]) == 1
-        ):
+        if total_len < min_branch_pixels and (len(adj[start_key]) == 1 or len(adj[end_key]) == 1):
             return  # prune short stub
 
         # Choose step count so spacing ≈ target_seg_px
@@ -320,7 +318,8 @@ def simplify_graph(
     # Re-index
     used = set()
     for a, b in new_edges_set:
-        used.add(a); used.add(b)
+        used.add(a)
+        used.add(b)
     remap = {old: i for i, old in enumerate(sorted(used))}
     final_nodes = [new_nodes[o] for o in sorted(used)]
     final_edges = [(remap[a], remap[b]) for a, b in new_edges_set]
@@ -330,6 +329,7 @@ def simplify_graph(
 # ---------------------------------------------------------------------------
 # Step 5: Merge nearby nodes
 # ---------------------------------------------------------------------------
+
 
 def merge_nearby_nodes(
     nodes: list[tuple[int, int]],
@@ -388,9 +388,11 @@ def keep_largest_component(
     if not nodes:
         return nodes, edges
     from collections import defaultdict
+
     adj: dict[int, set[int]] = defaultdict(set)
     for a, b in edges:
-        adj[a].add(b); adj[b].add(a)
+        adj[a].add(b)
+        adj[b].add(a)
     visited: set[int] = set()
     comps: list[list[int]] = []
     for start in range(len(nodes)):
@@ -402,7 +404,8 @@ def keep_largest_component(
             n = stack.pop()
             if n in visited:
                 continue
-            visited.add(n); comp.append(n)
+            visited.add(n)
+            comp.append(n)
             stack.extend(adj[n] - visited)
         comps.append(comp)
     if len(comps) <= 1:
@@ -414,8 +417,9 @@ def keep_largest_component(
     new_edges = [(remap[a], remap[b]) for a, b in edges if a in keep and b in keep]
     removed = len(nodes) - len(new_nodes)
     if removed:
-        print(f"    dropped {removed} node(s) in {len(comps)-1} small component(s)")
+        print(f"    dropped {removed} node(s) in {len(comps) - 1} small component(s)")
     return new_nodes, new_edges
+
 
 def process_char(
     ch: str,
@@ -446,6 +450,7 @@ def process_char(
 # ---------------------------------------------------------------------------
 # Step 7: Write all characters into one USD file
 # ---------------------------------------------------------------------------
+
 
 def _graph_to_strands(edges: list[tuple[int, int]]) -> list[list[int]]:
     """Decompose a rod graph into strands (connected paths) for visual rendering.
@@ -505,7 +510,7 @@ def _graph_to_strands(edges: list[tuple[int, int]]) -> list[list[int]]:
             continue
         for nb in sorted(adj[start]):
             if ekey(start, nb) not in used:
-                strands.append(trace(start, nb))
+                strands.append(trace(start, nb))  # noqa: PERF401 - trace mutates used
 
     # Isolated degree-2 cycles (all nodes degree 2, e.g. letter O)
     for start in sorted(adj.keys()):
@@ -516,8 +521,9 @@ def _graph_to_strands(edges: list[tuple[int, int]]) -> list[list[int]]:
         if unused_nb is None:
             continue
         strand = trace(start, unused_nb)
-        # close the loop if it returns to start
-        if len(strand) > 2 and ekey(strand[-1], start) not in used:
+        # ``trace`` normally consumes the closing edge and already appends ``start``.
+        # Only add it here when traversal stopped one edge before the closure.
+        if len(strand) > 2 and strand[-1] != start and ekey(strand[-1], start) not in used:
             used.add(ekey(strand[-1], start))
             strand.append(start)
         strands.append(strand)
@@ -529,9 +535,9 @@ def write_multi_char_usda(
     text: str,
     char_data: list[tuple[list, list, tuple]],  # list of (nodes, edges, bitmap_shape) per char
     out_path: str,
-    pixel_height: int = 160,          # must match what was used in process_char
-    char_gap: float = 0.01,           # metres between characters
-    world_height: float = 0.20,       # metres - target height for all characters
+    pixel_height: int = 160,  # must match what was used in process_char
+    char_gap: float = 0.01,  # metres between characters
+    world_height: float = 0.20,  # metres - target height for all characters
     z_base: float = 0.05,
     rod_width: float = 0.003,
     stretch_stiffness: float = 1000.44,
@@ -544,11 +550,13 @@ def write_multi_char_usda(
 ):
     """Write text as AOUSD curve deformables.
 
-    Each character is a `PhysicsDeformableBodyAPI` Xform containing one or more
-    `BasisCurves` strands with `PhysicsCurvesDeformableSimAPI`. Pinned nodes are
-    authored as `PhysicsAttachment` prims to `/World`. Curve physical parameters
-    are authored on one bound material using AOUSD material attributes plus the
-    minimal Newton extension fields for damping/contact behavior.
+    Each character is an articulation Xform containing one or more `BasisCurves`
+    strands. Every strand owns its `PhysicsDeformableBodyAPI` and
+    `PhysicsCurvesDeformableSimAPI`; junction attachments weld the strands into a
+    rod graph. Pinned nodes are authored as `PhysicsAttachment` prims to `/World`.
+    Curve physical parameters are authored on one inherited bound material using
+    AOUSD material attributes plus the minimal Newton extension fields for
+    damping/contact behavior.
     """
     scale = world_height / pixel_height
 
@@ -567,25 +575,25 @@ def write_multi_char_usda(
         return ", ".join([f"{rod_width:.4f}"] * count)
 
     lines = []
-    lines.append('#usda 1.0')
-    lines.append('(')
+    lines.append("#usda 1.0")
+    lines.append("(")
     lines.append(f'    doc = """AOUSD curve deformable asset: text "{text}"')
-    lines.append('')
-    lines.append('    Generated by gen_text_rod.py from FreeType-rendered bitmaps.')
-    lines.append('    Pipeline: render -> threshold -> skeletonize -> simplify -> USD.')
-    lines.append('')
-    lines.append(f'    Characters: {len(text)}  Curves: {n_curves}')
-    lines.append(f'    Total nodes: {total_nodes}  Total edges: {total_edges}')
+    lines.append("")
+    lines.append("    Generated by gen_text_rod.py from FreeType-rendered bitmaps.")
+    lines.append("    Pipeline: render -> threshold -> skeletonize -> simplify -> USD.")
+    lines.append("")
+    lines.append(f"    Characters: {len(text)}  Curves: {n_curves}")
+    lines.append(f"    Total nodes: {total_nodes}  Total edges: {total_edges}")
     lines.append(f'    Curve diameter: {rod_width * 1000:.1f}mm"""')
     lines.append('    defaultPrim = "World"')
-    lines.append('    metersPerUnit = 1')
+    lines.append("    metersPerUnit = 1")
     lines.append('    upAxis = "Z"')
-    lines.append(')')
-    lines.append('')
+    lines.append(")")
+    lines.append("")
     lines.append('def Xform "World"')
-    lines.append('{')
+    lines.append("{")
     lines.append('    def Xform "text_rod"')
-    lines.append('    {')
+    lines.append("    {")
 
     x_offset = 0.0
     curve_idx = 0
@@ -606,16 +614,16 @@ def write_multi_char_usda(
         world_pts = [px_to_world(r, c) for r, c in nodes]
         top_row = min(r for r, _ in nodes)
         fixed_idx = next(i for i, (r, _) in enumerate(nodes) if r == top_row)
-        safe_ch = ch.replace('\\', '\\\\').replace('"', '\\"')
+        safe_ch = ch.replace("\\", "\\\\").replace('"', '\\"')
         strands = char_strands[char_idx]
 
-        lines.append(f'        def Xform "curve_{curve_idx}" (  # character \'{safe_ch}\'')
-        lines.append('            prepend apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]')
-        lines.append('        )')
-        lines.append('        {')
-        lines.append('            rel material:binding = </World/Looks/CablePhysicsMaterial> (')
+        lines.append(f"        def Xform \"curve_{curve_idx}\" (  # character '{safe_ch}'")
+        lines.append('            prepend apiSchemas = ["MaterialBindingAPI"]')
+        lines.append("        )")
+        lines.append("        {")
+        lines.append("            rel material:binding = </World/Looks/CablePhysicsMaterial> (")
         lines.append('                bindMaterialAs = "weakerThanDescendants"')
-        lines.append('            )')
+        lines.append("            )")
 
         fixed_src = None
         fixed_local_index = None
@@ -631,20 +639,20 @@ def write_multi_char_usda(
                 continue
             emitted_strands.append((s_idx, strand_indices))
             if fixed_idx in strand_indices and fixed_src is None:
-                fixed_src = f'</World/text_rod/curve_{curve_idx}/strand_{s_idx}>'
+                fixed_src = f"</World/text_rod/curve_{curve_idx}/strand_{s_idx}>"
                 fixed_local_index = strand_indices.index(fixed_idx)
             wrap_token = "periodic" if closed else "nonperiodic"
             lines.append(f'            def BasisCurves "strand_{s_idx}" (')
-            lines.append('                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]')
-            lines.append('            )')
-            lines.append('            {')
+            lines.append('                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]')
+            lines.append("            )")
+            lines.append("            {")
             lines.append('                uniform token[] curveType = ["linear"]')
-            lines.append(f'                int[] curveVertexCounts = [{s_n}]')
+            lines.append(f"                int[] curveVertexCounts = [{s_n}]")
             lines.append('                uniform token type = "linear"')
             lines.append(f'                uniform token wrap = "{wrap_token}"')
-            lines.append(f'                float[] widths = [{fmt_widths(s_n)}]')
-            lines.append(f'                point3f[] points = [{fmt_points(s_points)}]')
-            lines.append('            }')
+            lines.append(f"                float[] widths = [{fmt_widths(s_n)}]")
+            lines.append(f"                point3f[] points = [{fmt_points(s_points)}]")
+            lines.append("            }")
 
         node_occurrences: dict[int, dict[int, int]] = {}
         for s_idx, strand_indices in emitted_strands:
@@ -658,61 +666,67 @@ def write_multi_char_usda(
             parent_s_idx, parent_local_idx = occurrences[0]
             for attach_i, (child_s_idx, child_local_idx) in enumerate(occurrences[1:], start=1):
                 lines.append(f'            def PhysicsAttachment "junction_{original_idx}_{attach_i}"')
-                lines.append('            {')
-                lines.append(f'                rel physics:src0 = </World/text_rod/curve_{curve_idx}/strand_{child_s_idx}>')
-                lines.append(f'                rel physics:src1 = </World/text_rod/curve_{curve_idx}/strand_{parent_s_idx}>')
+                lines.append("            {")
+                lines.append(f"                rel physics:src0 = </World/text_rod/curve_{curve_idx}/strand_{child_s_idx}>")
+                lines.append(f"                rel physics:src1 = </World/text_rod/curve_{curve_idx}/strand_{parent_s_idx}>")
                 lines.append('                uniform token physics:type0 = "point"')
                 lines.append('                uniform token physics:type1 = "point"')
-                lines.append(f'                int[] physics:indices0 = [{child_local_idx}]')
-                lines.append(f'                int[] physics:indices1 = [{parent_local_idx}]')
-                lines.append('                vector3f[] physics:coords0 = []')
-                lines.append('                vector3f[] physics:coords1 = []')
-                lines.append('                float physics:stiffness = inf')
-                lines.append('                float physics:damping = 0.0')
-                lines.append('            }')
+                lines.append(f"                int[] physics:indices0 = [{child_local_idx}]")
+                lines.append(f"                int[] physics:indices1 = [{parent_local_idx}]")
+                lines.append("                vector3f[] physics:coords0 = []")
+                lines.append("                vector3f[] physics:coords1 = []")
+                lines.append("                float physics:stiffness = inf")
+                lines.append("                float physics:damping = 0.0")
+                lines.append("            }")
 
         if fixed_src is not None and fixed_local_index is not None:
             lines.append(f'            def PhysicsAttachment "fixed_point_{fixed_idx}"')
-            lines.append('            {')
-            lines.append(f'                rel physics:src0 = {fixed_src}')
-            lines.append('                rel physics:src1 = </World>')
+            lines.append("            {")
+            lines.append(f"                rel physics:src0 = {fixed_src}")
+            lines.append("                rel physics:src1 = </World>")
             lines.append('                uniform token physics:type0 = "point"')
             lines.append('                uniform token physics:type1 = "xform"')
-            lines.append(f'                int[] physics:indices0 = [{fixed_local_index}]')
-            lines.append('                int[] physics:indices1 = []')
-            lines.append('                vector3f[] physics:coords0 = []')
-            lines.append(f'                vector3f[] physics:coords1 = [({fixed_world_pos[0]:.5f}, {fixed_world_pos[1]:.5f}, {fixed_world_pos[2]:.5f})]')
-            lines.append('                float physics:stiffness = inf')
-            lines.append('                float physics:damping = 0.0')
-            lines.append('            }')
+            lines.append(f"                int[] physics:indices0 = [{fixed_local_index}]")
+            lines.append("                int[] physics:indices1 = []")
+            lines.append("                vector3f[] physics:coords0 = []")
+            lines.append(
+                f"                vector3f[] physics:coords1 = [({fixed_world_pos[0]:.5f}, {fixed_world_pos[1]:.5f}, {fixed_world_pos[2]:.5f})]"
+            )
+            lines.append("                float physics:stiffness = inf")
+            lines.append("                float physics:damping = 0.0")
+            lines.append("            }")
 
-        lines.append('        }')
+        lines.append("        }")
         x_offset += char_world_width + char_gap
         curve_idx += 1
 
-    lines.append('    }')
-    lines.append('')
+    lines.append("    }")
+    lines.append("")
     lines.append('    def Scope "Looks"')
-    lines.append('    {')
+    lines.append("    {")
     lines.append('        def Material "CablePhysicsMaterial" (')
-    lines.append('            prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]')
-    lines.append('        )')
-    lines.append('        {')
-    lines.append(f'            float physics:thickness = {rod_width}')
-    lines.append(f'            float physics:stretchStiffness = {stretch_stiffness}')
-    lines.append(f'            float physics:bendStiffness = {bend_stiffness}')
-    lines.append(f'            float newton:stretchDamping = {stretch_damping}')
-    lines.append(f'            float newton:bendDamping = {bend_damping}')
-    lines.append(f'            float physics:dynamicFriction = {contact_mu}')
-    lines.append(f'            float physics:staticFriction = {contact_mu}')
-    lines.append(f'            float newton:contactStiffness = {contact_ke}')
-    lines.append(f'            float newton:contactDamping = {contact_kd}')
-    lines.append('        }')
-    lines.append('    }')
-    lines.append('}')
-    lines.append('')
+    lines.append(
+        '            prepend apiSchemas = ["PhysicsMaterialAPI", '
+        '"PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", '
+        '"NewtonCurvesDeformableMaterialAPI"]'
+    )
+    lines.append("        )")
+    lines.append("        {")
+    lines.append(f"            float physics:thickness = {rod_width}")
+    lines.append(f"            float physics:stretchStiffness = {stretch_stiffness}")
+    lines.append(f"            float physics:bendStiffness = {bend_stiffness}")
+    lines.append(f"            float newton:stretchDamping = {stretch_damping}")
+    lines.append(f"            float newton:bendDamping = {bend_damping}")
+    lines.append(f"            float physics:dynamicFriction = {contact_mu}")
+    lines.append(f"            float physics:staticFriction = {contact_mu}")
+    lines.append(f"            float newton:contactStiffness = {contact_ke}")
+    lines.append(f"            float newton:contactDamping = {contact_kd}")
+    lines.append("        }")
+    lines.append("    }")
+    lines.append("}")
+    lines.append("")
 
-    Path(out_path).write_text('\n'.join(lines))
+    Path(out_path).write_text("\n".join(lines))
     print(f"Wrote: {out_path}")
     print(f"  characters={len(text)}  curves={n_curves}  total_nodes={total_nodes}  total_edges={total_edges}")
 
@@ -759,6 +773,7 @@ def generate(
 
         if debug and nodes:
             from PIL import Image
+
             bitmap = render_text_bitmap(ch, font, pixel_height=pixel_height)
             skel = skeletonize_bitmap(bitmap, threshold=threshold)
             dbg = np.zeros((*bitmap.shape, 3), dtype=np.uint8)
@@ -816,4 +831,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -63,14 +63,14 @@ def Xform "World"
             prepend apiSchemas = ["PhysicsMaterialAPI", "PhysicsCurvesDeformableMaterialAPI", "NewtonMaterialAPI", "NewtonCurvesDeformableMaterialAPI"]
         )
         {
-            float newton:bendDamping = 0.001
-            float newton:contactDamping = 1
-            float newton:contactStiffness = 100
+            float newton:bendDamping = 0.0
+            float newton:contactDamping = 100
+            float newton:contactStiffness = 2500
             float newton:stretchDamping = 0
-            float physics:bendStiffness = 800
+            float physics:bendStiffness = 1500000000
             float physics:dynamicFriction = 0.5
             float physics:staticFriction = 0.5
-            float physics:stretchStiffness = 150000
+            float physics:stretchStiffness = 150000000
             float physics:thickness = 0.008
         }
     }
