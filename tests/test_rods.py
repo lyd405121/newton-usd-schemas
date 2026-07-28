@@ -32,6 +32,7 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
             "newton:youngsModulus",
             "newton:poissonRatio",
             "newton:stretchDamping",
+            "newton:shearDamping",
             "newton:bendDamping",
             "newton:twistDamping",
         ):
@@ -47,6 +48,7 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
         self.assertEqual(self.material.GetAttribute("newton:youngsModulus").Get(), -math.inf)
         self.assertEqual(self.material.GetAttribute("newton:poissonRatio").Get(), -math.inf)
         self.assertEqual(self.material.GetAttribute("newton:stretchDamping").Get(), -math.inf)
+        self.assertEqual(self.material.GetAttribute("newton:shearDamping").Get(), -math.inf)
         self.assertEqual(self.material.GetAttribute("newton:bendDamping").Get(), -math.inf)
         self.assertEqual(self.material.GetAttribute("newton:twistDamping").Get(), -math.inf)
 
@@ -57,8 +59,9 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
             "newton:youngsModulus": 1.2e7,
             "newton:poissonRatio": 0.35,
             "newton:stretchDamping": 0.01,
-            "newton:bendDamping": 0.02,
-            "newton:twistDamping": 0.03,
+            "newton:shearDamping": 0.02,
+            "newton:bendDamping": 0.03,
+            "newton:twistDamping": 0.04,
         }
         for name, value in values.items():
             attr = self.material.GetAttribute(name)
@@ -73,6 +76,7 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
         for name in (
             "newton:youngsModulus",
             "newton:stretchDamping",
+            "newton:shearDamping",
             "newton:bendDamping",
             "newton:twistDamping",
         ):

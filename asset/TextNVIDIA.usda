@@ -18,14 +18,14 @@ def Xform "World"
     def Xform "text_rod"
     {
         def Xform "curve_0" (  # character 'N'
-            prepend apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+            prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
             rel material:binding = </World/Looks/CablePhysicsMaterial> (
                 bindMaterialAs = "weakerThanDescendants"
             )
             def BasisCurves "strand_0" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -50,14 +50,14 @@ def Xform "World"
             }
         }
         def Xform "curve_1" (  # character 'V'
-            prepend apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+            prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
             rel material:binding = </World/Looks/CablePhysicsMaterial> (
                 bindMaterialAs = "weakerThanDescendants"
             )
             def BasisCurves "strand_0" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -82,14 +82,14 @@ def Xform "World"
             }
         }
         def Xform "curve_2" (  # character 'I'
-            prepend apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+            prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
             rel material:binding = </World/Looks/CablePhysicsMaterial> (
                 bindMaterialAs = "weakerThanDescendants"
             )
             def BasisCurves "strand_0" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -114,14 +114,14 @@ def Xform "World"
             }
         }
         def Xform "curve_3" (  # character 'D'
-            prepend apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+            prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
             rel material:binding = </World/Looks/CablePhysicsMaterial> (
                 bindMaterialAs = "weakerThanDescendants"
             )
             def BasisCurves "strand_0" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -146,14 +146,14 @@ def Xform "World"
             }
         }
         def Xform "curve_4" (  # character 'I'
-            prepend apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+            prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
             rel material:binding = </World/Looks/CablePhysicsMaterial> (
                 bindMaterialAs = "weakerThanDescendants"
             )
             def BasisCurves "strand_0" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -178,14 +178,14 @@ def Xform "World"
             }
         }
         def Xform "curve_5" (  # character 'A'
-            prepend apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+            prepend apiSchemas = ["MaterialBindingAPI"]
         )
         {
             rel material:binding = </World/Looks/CablePhysicsMaterial> (
                 bindMaterialAs = "weakerThanDescendants"
             )
             def BasisCurves "strand_0" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -196,7 +196,7 @@ def Xform "World"
                 point3f[] points = [(0.83875, 0.00000, 0.10406), (0.84000, 0.00000, 0.11125), (0.84125, 0.00000, 0.11625), (0.84250, 0.00000, 0.12250), (0.84250, 0.00000, 0.12875), (0.84500, 0.00000, 0.13375), (0.84625, 0.00000, 0.13875), (0.84875, 0.00000, 0.14375), (0.85000, 0.00000, 0.15000), (0.85250, 0.00000, 0.15500), (0.85375, 0.00000, 0.16000), (0.85625, 0.00000, 0.16625), (0.85750, 0.00000, 0.17125), (0.86000, 0.00000, 0.17625), (0.86250, 0.00000, 0.18250), (0.86750, 0.00000, 0.18500), (0.87250, 0.00000, 0.18750), (0.87750, 0.00000, 0.18750), (0.88375, 0.00000, 0.18500), (0.88750, 0.00000, 0.18250), (0.89125, 0.00000, 0.17625), (0.89250, 0.00000, 0.17125), (0.89500, 0.00000, 0.16625), (0.89625, 0.00000, 0.16125), (0.89875, 0.00000, 0.15500), (0.90000, 0.00000, 0.15000), (0.90250, 0.00000, 0.14500), (0.90375, 0.00000, 0.13875), (0.90625, 0.00000, 0.13375), (0.90750, 0.00000, 0.12875), (0.90875, 0.00000, 0.12250), (0.91000, 0.00000, 0.11625), (0.91000, 0.00000, 0.11125), (0.91125, 0.00000, 0.10406)]
             }
             def BasisCurves "strand_1" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -207,7 +207,7 @@ def Xform "World"
                 point3f[] points = [(0.83875, 0.00000, 0.10406), (0.83250, 0.00000, 0.10000), (0.83000, 0.00000, 0.09500), (0.82750, 0.00000, 0.08875), (0.82625, 0.00000, 0.08375), (0.82375, 0.00000, 0.07750), (0.82125, 0.00000, 0.07250), (0.81625, 0.00000, 0.07000), (0.81125, 0.00000, 0.06625), (0.80500, 0.00000, 0.06375), (0.80000, 0.00000, 0.06125)]
             }
             def BasisCurves "strand_2" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -218,7 +218,7 @@ def Xform "World"
                 point3f[] points = [(0.83875, 0.00000, 0.10406), (0.84500, 0.00000, 0.10000), (0.85125, 0.00000, 0.10000), (0.85625, 0.00000, 0.10000), (0.86250, 0.00000, 0.10000), (0.86875, 0.00000, 0.10000), (0.87500, 0.00000, 0.10000), (0.88125, 0.00000, 0.10000), (0.88750, 0.00000, 0.10000), (0.89375, 0.00000, 0.10000), (0.89875, 0.00000, 0.10000), (0.90500, 0.00000, 0.10000), (0.91125, 0.00000, 0.10406)]
             }
             def BasisCurves "strand_3" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]

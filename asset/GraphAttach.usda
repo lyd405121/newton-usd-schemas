@@ -184,7 +184,7 @@ def Xform "World"
     def Xform "rod_graph"
     {
         def Xform "curve_0" (
-            apiSchemas = ["PhysicsDeformableBodyAPI", "MaterialBindingAPI", "NewtonArticulationRootAPI"]
+            apiSchemas = ["MaterialBindingAPI"]
         )
         {
             rel material:binding = </World/Looks/CablePhysicsMaterial> (
@@ -192,7 +192,7 @@ def Xform "World"
             )
 
             def BasisCurves "visual_trunk" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -204,7 +204,7 @@ def Xform "World"
             }
 
             def BasisCurves "visual_branchA" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -216,7 +216,7 @@ def Xform "World"
             }
 
             def BasisCurves "visual_branchB" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
@@ -228,7 +228,7 @@ def Xform "World"
             }
 
             def BasisCurves "visual_branchC" (
-                prepend apiSchemas = ["PhysicsCurvesDeformableSimAPI"]
+                prepend apiSchemas = ["PhysicsDeformableBodyAPI", "PhysicsCurvesDeformableSimAPI"]
             )
             {
                 uniform token[] curveType = ["linear"]
