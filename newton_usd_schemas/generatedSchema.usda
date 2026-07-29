@@ -873,42 +873,17 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
     Apply this API to the same `Material` prim that carries
     `PhysicsCurvesDeformableMaterialAPI`. The standard AOUSD API owns curve thickness
     and stretch/shear/bend/twist stiffness; this API only stores Newton-specific
-    controls that are not part of the AOUSD curve material schema."""
+    controls that are not part of the AOUSD curve material schema.
+
+    Newton's curve-deformable runtime requires Young's modulus `E` and Poisson ratio
+    `nu` to be provided by the AOUSD curve material schema once those attributes are
+    standardized;  `E` governs stretch and bend response, while `E` and `nu` determine 
+    the shear modulus `G = E / (2 * (1 + nu))`, which governs shear and twist response. 
+    Converting these material moduli into discrete stretch/shear/bend/twist stiffness
+    also depends on cross-sectional area, second and polar moments of area, shear correction, 
+    segment rest length, and the solver's rod discretization."""
 )
 {
-    float newton:youngsModulus = -inf (
-        doc = """Youngs modulus used by Newton importers to derive curve stiffness when
-        AOUSD stiffness values are not authored or an importer chooses an elastic-material
-        parameterization.
-
-        If set to -inf, the importer should use the authored AOUSD curve stiffness values
-        or its simulator defaults.
-
-        Range: [0, inf)
-        Units: pressure"""
-        limits = {
-            dictionary soft = {
-                float minimum = 0
-            }
-        }
-    )
-
-    float newton:poissonRatio = -inf (
-        doc = """Poisson ratio used with `newton:youngsModulus` to derive shear or twist
-        response for Newton curve solvers.
-
-        If set to -inf, the value is unset.
-
-        Range: [-1, 0.5]
-        Units: dimensionless"""
-        limits = {
-            dictionary soft = {
-                float minimum = -1
-                float maximum = 0.5
-            }
-        }
-    )
-
     float newton:stretchDamping = -inf (
         doc = """Newton stretch damping for curve deformables.
 

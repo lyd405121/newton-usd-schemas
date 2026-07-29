@@ -29,8 +29,6 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
         self.assertTrue(self.material.HasAPI("NewtonCurvesDeformableMaterialAPI"))
 
         for name in (
-            "newton:youngsModulus",
-            "newton:poissonRatio",
             "newton:stretchDamping",
             "newton:shearDamping",
             "newton:bendDamping",
@@ -45,8 +43,6 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
 
     def test_material_parameter_defaults(self):
         self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
-        self.assertEqual(self.material.GetAttribute("newton:youngsModulus").Get(), -math.inf)
-        self.assertEqual(self.material.GetAttribute("newton:poissonRatio").Get(), -math.inf)
         self.assertEqual(self.material.GetAttribute("newton:stretchDamping").Get(), -math.inf)
         self.assertEqual(self.material.GetAttribute("newton:shearDamping").Get(), -math.inf)
         self.assertEqual(self.material.GetAttribute("newton:bendDamping").Get(), -math.inf)
@@ -56,8 +52,6 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
         self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
 
         values = {
-            "newton:youngsModulus": 1.2e7,
-            "newton:poissonRatio": 0.35,
             "newton:stretchDamping": 0.01,
             "newton:shearDamping": 0.02,
             "newton:bendDamping": 0.03,
@@ -74,7 +68,6 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
 
         self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
         for name in (
-            "newton:youngsModulus",
             "newton:stretchDamping",
             "newton:shearDamping",
             "newton:bendDamping",
@@ -84,11 +77,6 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
             self.assertTrue(limits.IsValid(), name)
             self.assertEqual(limits.GetMinimum(), 0.0)
             self.assertIsNone(limits.GetMaximum())
-
-        poisson = self.material.GetAttribute("newton:poissonRatio").GetSoftLimits()
-        self.assertTrue(poisson.IsValid())
-        self.assertEqual(poisson.GetMinimum(), -1.0)
-        self.assertEqual(poisson.GetMaximum(), 0.5)
 
 
 if __name__ == "__main__":
