@@ -912,6 +912,20 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
         }
     )
 
+    float newton:shearDamping = -inf (
+        doc = """Newton shear damping for curve deformables.
+
+        AOUSD curve materials do not define solver damping. If set to -inf, the importer
+        should use its simulator default.
+
+        Range: [0, inf)"""
+        limits = {
+            dictionary soft = {
+                float minimum = 0
+            }
+        }
+    )
+
     float newton:bendDamping = -inf (
         doc = """Newton bend damping for curve deformables.
 
