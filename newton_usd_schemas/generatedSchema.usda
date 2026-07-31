@@ -877,20 +877,35 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
 
     Newton's curve-deformable runtime requires Young's modulus `E` and Poisson ratio
     `nu` to be provided by the AOUSD curve material schema once those attributes are
-    standardized;  `E` governs stretch and bend response, while `E` and `nu` determine 
-    the shear modulus `G = E / (2 * (1 + nu))`, which governs shear and twist response. 
+    standardized; `E` governs stretch and bend response, while `E` and `nu` determine
+    the shear modulus `G = E / (2 * (1 + nu))`, which governs shear and twist response.
     Converting these material moduli into discrete stretch/shear/bend/twist stiffness
-    also depends on cross-sectional area, second and polar moments of area, shear correction, 
-    segment rest length, and the solver's rod discretization."""
+    also depends on cross-sectional area, second and polar moments of area, and shear correction.
+
+    Newton converts material-level curve stiffness and damping values into per-joint
+    coefficients using the joint-local dual rest length:
+
+        L_joint = 0.5 * (L_parent + L_child)
+
+    where `L_parent` and `L_child` are the adjacent segments' rest lengths. The corresponding
+    per-joint stiffness and damping coefficients are divided by `L_joint`.
+
+    If both `physics:shearStiffness` and `newton:shearDamping` are unset, Newton uses
+    the stretch damping for shear. Likewise, if both `physics:twistStiffness` and
+    `newton:twistDamping` are unset, Newton uses the bend damping for twist. If either
+    stiffness is authored without its corresponding damping, that mode instead uses the
+    engine's zero-damping default."""
 )
 {
     float newton:stretchDamping = -inf (
         doc = """Newton stretch damping for curve deformables.
 
-        AOUSD curve materials do not define solver damping. If set to -inf, the importer
-        should use its simulator default.
+        AOUSD curve materials do not define solver damping.
 
-        Range: [0, inf)"""
+        If `newton:stretchDamping` is set to `-inf`, the engine's default should be used instead.
+
+        Range: [0, inf)
+        Units: force * time"""
         limits = {
             dictionary soft = {
                 float minimum = 0
@@ -901,10 +916,12 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
     float newton:shearDamping = -inf (
         doc = """Newton shear damping for curve deformables.
 
-        AOUSD curve materials do not define solver damping. If set to -inf, the importer
-        should use its simulator default.
+        AOUSD curve materials do not define solver damping.
 
-        Range: [0, inf)"""
+        If `newton:shearDamping` is set to `-inf`, the engine's default should be used instead.
+
+        Range: [0, inf)
+        Units: force * time"""
         limits = {
             dictionary soft = {
                 float minimum = 0
@@ -915,10 +932,12 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
     float newton:bendDamping = -inf (
         doc = """Newton bend damping for curve deformables.
 
-        AOUSD curve materials do not define solver damping. If set to -inf, the importer
-        should use its simulator default.
+        AOUSD curve materials do not define solver damping.
 
-        Range: [0, inf)"""
+        If `newton:bendDamping` is set to `-inf`, the engine's default should be used instead.
+
+        Range: [0, inf)
+        Units: force * distance * distance * time"""
         limits = {
             dictionary soft = {
                 float minimum = 0
@@ -929,10 +948,12 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
     float newton:twistDamping = -inf (
         doc = """Newton twist damping for curve deformables.
 
-        AOUSD curve materials do not define solver damping. If set to -inf, the importer
-        should use its simulator default.
+        AOUSD curve materials do not define solver damping.
 
-        Range: [0, inf)"""
+        If `newton:twistDamping` is set to `-inf`, the engine's default should be used instead.
+
+        Range: [0, inf)
+        Units: force * distance * distance * time"""
         limits = {
             dictionary soft = {
                 float minimum = 0

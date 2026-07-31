@@ -41,42 +41,85 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
         self.assertFalse(prim.CanApplyAPI("NewtonCurvesDeformableMaterialAPI"))
         self.assertTrue(self.material.CanApplyAPI("NewtonCurvesDeformableMaterialAPI"))
 
-    def test_material_parameter_defaults(self):
-        self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
-        self.assertEqual(self.material.GetAttribute("newton:stretchDamping").Get(), -math.inf)
-        self.assertEqual(self.material.GetAttribute("newton:shearDamping").Get(), -math.inf)
-        self.assertEqual(self.material.GetAttribute("newton:bendDamping").Get(), -math.inf)
-        self.assertEqual(self.material.GetAttribute("newton:twistDamping").Get(), -math.inf)
-
-    def test_material_parameter_roundtrip(self):
-        self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
-
-        values = {
-            "newton:stretchDamping": 0.01,
-            "newton:shearDamping": 0.02,
-            "newton:bendDamping": 0.03,
-            "newton:twistDamping": 0.04,
-        }
-        for name, value in values.items():
-            attr = self.material.GetAttribute(name)
-            self.assertTrue(attr.Set(value), name)
-            self.assertAlmostEqual(attr.Get(), value)
-
-    def test_limits(self):
-        if not USD_HAS_LIMITS:
-            self.skipTest("USD build does not expose schema limits")
+    def test_stretch_damping(self):
+        self.assertFalse(self.material.HasAttribute("newton:stretchDamping"))
 
         self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
-        for name in (
-            "newton:stretchDamping",
-            "newton:shearDamping",
-            "newton:bendDamping",
-            "newton:twistDamping",
-        ):
-            limits = self.material.GetAttribute(name).GetSoftLimits()
-            self.assertTrue(limits.IsValid(), name)
-            self.assertEqual(limits.GetMinimum(), 0.0)
-            self.assertIsNone(limits.GetMaximum())
+        attr = self.material.GetAttribute("newton:stretchDamping")
+        self.assertIsNotNone(attr)
+        self.assertFalse(attr.HasAuthoredValue())
+        self.assertEqual(attr.Get(), -math.inf)
+
+        success = attr.Set(0.01)
+        self.assertTrue(success)
+        self.assertTrue(attr.HasAuthoredValue())
+        self.assertAlmostEqual(attr.Get(), 0.01)
+
+        if USD_HAS_LIMITS:
+            soft = attr.GetSoftLimits()
+            self.assertTrue(soft.IsValid())
+            self.assertAlmostEqual(soft.GetMinimum(), 0.0)
+            self.assertIsNone(soft.GetMaximum())
+
+    def test_shear_damping(self):
+        self.assertFalse(self.material.HasAttribute("newton:shearDamping"))
+
+        self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
+        attr = self.material.GetAttribute("newton:shearDamping")
+        self.assertIsNotNone(attr)
+        self.assertFalse(attr.HasAuthoredValue())
+        self.assertEqual(attr.Get(), -math.inf)
+
+        success = attr.Set(0.02)
+        self.assertTrue(success)
+        self.assertTrue(attr.HasAuthoredValue())
+        self.assertAlmostEqual(attr.Get(), 0.02)
+
+        if USD_HAS_LIMITS:
+            soft = attr.GetSoftLimits()
+            self.assertTrue(soft.IsValid())
+            self.assertAlmostEqual(soft.GetMinimum(), 0.0)
+            self.assertIsNone(soft.GetMaximum())
+
+    def test_bend_damping(self):
+        self.assertFalse(self.material.HasAttribute("newton:bendDamping"))
+
+        self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
+        attr = self.material.GetAttribute("newton:bendDamping")
+        self.assertIsNotNone(attr)
+        self.assertFalse(attr.HasAuthoredValue())
+        self.assertEqual(attr.Get(), -math.inf)
+
+        success = attr.Set(0.03)
+        self.assertTrue(success)
+        self.assertTrue(attr.HasAuthoredValue())
+        self.assertAlmostEqual(attr.Get(), 0.03)
+
+        if USD_HAS_LIMITS:
+            soft = attr.GetSoftLimits()
+            self.assertTrue(soft.IsValid())
+            self.assertAlmostEqual(soft.GetMinimum(), 0.0)
+            self.assertIsNone(soft.GetMaximum())
+
+    def test_twist_damping(self):
+        self.assertFalse(self.material.HasAttribute("newton:twistDamping"))
+
+        self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
+        attr = self.material.GetAttribute("newton:twistDamping")
+        self.assertIsNotNone(attr)
+        self.assertFalse(attr.HasAuthoredValue())
+        self.assertEqual(attr.Get(), -math.inf)
+
+        success = attr.Set(0.04)
+        self.assertTrue(success)
+        self.assertTrue(attr.HasAuthoredValue())
+        self.assertAlmostEqual(attr.Get(), 0.04)
+
+        if USD_HAS_LIMITS:
+            soft = attr.GetSoftLimits()
+            self.assertTrue(soft.IsValid())
+            self.assertAlmostEqual(soft.GetMinimum(), 0.0)
+            self.assertIsNone(soft.GetMaximum())
 
 
 if __name__ == "__main__":
