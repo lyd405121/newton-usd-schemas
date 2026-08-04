@@ -900,8 +900,6 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
     float newton:stretchDamping = -inf (
         doc = """Newton stretch damping for curve deformables.
 
-        AOUSD curve materials do not define solver damping.
-
         If `newton:stretchDamping` is set to `-inf`, the engine's default should be used instead.
 
         Range: [0, inf)
@@ -915,8 +913,6 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
 
     float newton:shearDamping = -inf (
         doc = """Newton shear damping for curve deformables.
-
-        AOUSD curve materials do not define solver damping.
 
         If `newton:shearDamping` is set to `-inf`, the engine's default should be used instead.
 
@@ -932,8 +928,6 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
     float newton:bendDamping = -inf (
         doc = """Newton bend damping for curve deformables.
 
-        AOUSD curve materials do not define solver damping.
-
         If `newton:bendDamping` is set to `-inf`, the engine's default should be used instead.
 
         Range: [0, inf)
@@ -947,8 +941,6 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
 
     float newton:twistDamping = -inf (
         doc = """Newton twist damping for curve deformables.
-
-        AOUSD curve materials do not define solver damping.
 
         If `newton:twistDamping` is set to `-inf`, the engine's default should be used instead.
 
