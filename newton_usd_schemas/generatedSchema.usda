@@ -868,57 +868,36 @@ class NewtonMaterialAPI "NewtonMaterialAPI" (
 
 class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
     apiSchemas = ["PhysicsMaterialAPI"]
-    doc = """Newton extension material parameters for AOUSD curve deformables.
+    doc = """`NewtonCurvesDeformableMaterialAPI` applies on top of a `Material`, providing extra damping attributes for Newton's curve deformables.
 
-    Apply this API to the same `Material` prim that carries
-    `PhysicsCurvesDeformableMaterialAPI`. The standard AOUSD API owns curve thickness
-    and stretch/shear/bend/twist stiffness; this API only stores Newton-specific
-    controls that are not part of the AOUSD curve material schema.
+    By applying this schema, the prim also inherits the `PhysicsMaterialAPI` schema.
 
-    Newton's curve-deformable runtime requires Young's modulus `E` and Poisson ratio
-    `nu` to be provided by the AOUSD curve material schema once those attributes are
-    standardized; `E` governs stretch and bend response, while `E` and `nu` determine
-    the shear modulus `G = E / (2 * (1 + nu))`, which governs shear and twist response.
-    Converting these material moduli into discrete stretch/shear/bend/twist stiffness
-    also depends on cross-sectional area, second and polar moments of area, and shear correction.
+    Apply this schema alongside `PhysicsCurvesDeformableMaterialAPI`, which provides
+    `physics:curvesThickness`, per-mode structural stiffnesses
+    `physics:curvesStretchStiffness`, `physics:curvesShearStiffness`,
+    `physics:curvesBendStiffness` and `physics:curvesTwistStiffness`, and the isotropic
+    fallback pair `physics:youngsModulus` and `physics:poissonsRatio`.
+    This schema extends a `PhysicsCurvesDeformableMaterialAPI` with corresponding damping
+    coefficients for each stiffness.
 
-    Newton converts material-level curve stiffness and damping values into per-joint
-    coefficients using the joint-local dual rest length:
+    Newton requires `physics:youngsModulus` and `physics:poissonsRatio` to be honored for
+    curve deformables. Where a stiffness is unauthored it is derived from them and
+    `physics:curvesThickness`: `physics:youngsModulus` governs the stretch and bend response,
+    while both together give the shear modulus
+    `G = physics:youngsModulus / (2 * (1 + physics:poissonsRatio))`, which governs the
+    transverse shear and twist response.
 
-        L_joint = 0.5 * (L_parent + L_child)
-
-    where `L_parent` and `L_child` are the adjacent segments' rest lengths. The corresponding
-    per-joint stiffness and damping coefficients are divided by `L_joint`.
-
-    If both `physics:shearStiffness` and `newton:shearDamping` are unset, Newton uses
-    the stretch damping for shear. Likewise, if both `physics:twistStiffness` and
-    `newton:twistDamping` are unset, Newton uses the bend damping for twist. If either
-    stiffness is authored without its corresponding damping, that mode instead uses the
-    engine's zero-damping default."""
+    The proposal defines no damping modulus, so damping has no equivalent derivation: each
+    damping attribute is independent, and an unauthored one falls back to the engine's
+    default rather than to another mode's damping."""
 )
 {
-    float newton:stretchDamping = -inf (
+    float newton:curvesStretchDamping = -inf (
         doc = """Newton stretch damping for curve deformables.
 
-        AOUSD curve materials do not define solver damping.
+        Damps the stretch mode whose stiffness is `physics:curvesStretchStiffness`.
 
-        If `newton:stretchDamping` is set to `-inf`, the engine's default should be used instead.
-
-        Range: [0, inf)
-        Units: force * time"""
-        limits = {
-            dictionary soft = {
-                float minimum = 0
-            }
-        }
-    )
-
-    float newton:shearDamping = -inf (
-        doc = """Newton shear damping for curve deformables.
-
-        AOUSD curve materials do not define solver damping.
-
-        If `newton:shearDamping` is set to `-inf`, the engine's default should be used instead.
+        If `newton:curvesStretchDamping` is set to `-inf`, the engine's default should be used instead.
 
         Range: [0, inf)
         Units: force * time"""
@@ -929,12 +908,28 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
         }
     )
 
-    float newton:bendDamping = -inf (
+    float newton:curvesShearDamping = -inf (
+        doc = """Newton transverse shear damping for curve deformables.
+
+        Damps the shear mode whose stiffness is `physics:curvesShearStiffness`.
+
+        If `newton:curvesShearDamping` is set to `-inf`, the engine's default should be used instead.
+
+        Range: [0, inf)
+        Units: force * time"""
+        limits = {
+            dictionary soft = {
+                float minimum = 0
+            }
+        }
+    )
+
+    float newton:curvesBendDamping = -inf (
         doc = """Newton bend damping for curve deformables.
 
-        AOUSD curve materials do not define solver damping.
+        Damps the bend mode whose stiffness is `physics:curvesBendStiffness`.
 
-        If `newton:bendDamping` is set to `-inf`, the engine's default should be used instead.
+        If `newton:curvesBendDamping` is set to `-inf`, the engine's default should be used instead.
 
         Range: [0, inf)
         Units: force * distance * distance * time"""
@@ -945,12 +940,12 @@ class NewtonCurvesDeformableMaterialAPI "NewtonCurvesDeformableMaterialAPI" (
         }
     )
 
-    float newton:twistDamping = -inf (
+    float newton:curvesTwistDamping = -inf (
         doc = """Newton twist damping for curve deformables.
 
-        AOUSD curve materials do not define solver damping.
+        Damps the twist mode whose stiffness is `physics:curvesTwistStiffness`.
 
-        If `newton:twistDamping` is set to `-inf`, the engine's default should be used instead.
+        If `newton:curvesTwistDamping` is set to `-inf`, the engine's default should be used instead.
 
         Range: [0, inf)
         Units: force * distance * distance * time"""

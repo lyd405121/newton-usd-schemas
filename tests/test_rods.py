@@ -29,10 +29,10 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
         self.assertTrue(self.material.HasAPI("NewtonCurvesDeformableMaterialAPI"))
 
         for name in (
-            "newton:stretchDamping",
-            "newton:shearDamping",
-            "newton:bendDamping",
-            "newton:twistDamping",
+            "newton:curvesStretchDamping",
+            "newton:curvesShearDamping",
+            "newton:curvesBendDamping",
+            "newton:curvesTwistDamping",
         ):
             self.assertTrue(self.material.HasAttribute(name), name)
 
@@ -41,11 +41,11 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
         self.assertFalse(prim.CanApplyAPI("NewtonCurvesDeformableMaterialAPI"))
         self.assertTrue(self.material.CanApplyAPI("NewtonCurvesDeformableMaterialAPI"))
 
-    def test_stretch_damping(self):
-        self.assertFalse(self.material.HasAttribute("newton:stretchDamping"))
+    def test_curves_stretch_damping(self):
+        self.assertFalse(self.material.HasAttribute("newton:curvesStretchDamping"))
 
         self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
-        attr = self.material.GetAttribute("newton:stretchDamping")
+        attr = self.material.GetAttribute("newton:curvesStretchDamping")
         self.assertIsNotNone(attr)
         self.assertFalse(attr.HasAuthoredValue())
         self.assertEqual(attr.Get(), -math.inf)
@@ -61,11 +61,11 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
             self.assertAlmostEqual(soft.GetMinimum(), 0.0)
             self.assertIsNone(soft.GetMaximum())
 
-    def test_shear_damping(self):
-        self.assertFalse(self.material.HasAttribute("newton:shearDamping"))
+    def test_curves_shear_damping(self):
+        self.assertFalse(self.material.HasAttribute("newton:curvesShearDamping"))
 
         self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
-        attr = self.material.GetAttribute("newton:shearDamping")
+        attr = self.material.GetAttribute("newton:curvesShearDamping")
         self.assertIsNotNone(attr)
         self.assertFalse(attr.HasAuthoredValue())
         self.assertEqual(attr.Get(), -math.inf)
@@ -81,11 +81,11 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
             self.assertAlmostEqual(soft.GetMinimum(), 0.0)
             self.assertIsNone(soft.GetMaximum())
 
-    def test_bend_damping(self):
-        self.assertFalse(self.material.HasAttribute("newton:bendDamping"))
+    def test_curves_bend_damping(self):
+        self.assertFalse(self.material.HasAttribute("newton:curvesBendDamping"))
 
         self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
-        attr = self.material.GetAttribute("newton:bendDamping")
+        attr = self.material.GetAttribute("newton:curvesBendDamping")
         self.assertIsNotNone(attr)
         self.assertFalse(attr.HasAuthoredValue())
         self.assertEqual(attr.Get(), -math.inf)
@@ -101,11 +101,11 @@ class TestNewtonCurvesDeformableMaterialAPI(unittest.TestCase):
             self.assertAlmostEqual(soft.GetMinimum(), 0.0)
             self.assertIsNone(soft.GetMaximum())
 
-    def test_twist_damping(self):
-        self.assertFalse(self.material.HasAttribute("newton:twistDamping"))
+    def test_curves_twist_damping(self):
+        self.assertFalse(self.material.HasAttribute("newton:curvesTwistDamping"))
 
         self.material.ApplyAPI("NewtonCurvesDeformableMaterialAPI")
-        attr = self.material.GetAttribute("newton:twistDamping")
+        attr = self.material.GetAttribute("newton:curvesTwistDamping")
         self.assertIsNotNone(attr)
         self.assertFalse(attr.HasAuthoredValue())
         self.assertEqual(attr.Get(), -math.inf)
